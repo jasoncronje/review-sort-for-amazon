@@ -140,14 +140,6 @@
     return soonest;
   }
 
-  function formatDelivery(ts) {
-    if (!isFinite(ts)) return "No delivery date";
-    const days = Math.round((ts - startOfToday()) / DAY_MS);
-    if (days <= 0) return "Arrives today";
-    if (days === 1) return "Arrives tomorrow";
-    return "Arrives " + new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  }
-
   function isSponsored(card) {
     return (
       card.classList.contains("AdHolder") ||
@@ -285,22 +277,20 @@
         const hide = (hideAds && item.sponsored) || (minRating && item.rating < minRating) || item.delivery > deadline;
         item.el.classList.toggle("rsa-hidden", !!hide);
         if (!hide) shown++;
+        // Only what the listing doesn't already show: the rank in our order, and the weighted
+        // score for "Best rated" (Amazon shows the count and delivery date itself).
         let badge = item.el.querySelector(".rsa-badge");
-        if (!badge) {
-          badge = document.createElement("div");
-          badge.className = "rsa-badge";
-          placeBadge(item.el, badge);
+        if (key === "featured" || hide) { badge?.remove(); }
+        else {
+          if (!badge) {
+            badge = document.createElement("div");
+            badge.className = "rsa-badge";
+            placeBadge(item.el, badge);
+          }
+          const label = { reviews: "most reviewed", rating: "highest rated", score: "best rated", delivery: "soonest to arrive" }[key];
+          badge.innerHTML = `<b>#${shown}</b> ${label}` +
+            (key === "score" ? `<span title="Star rating adjusted for how many reviews back it up">Weighted score ${item.score.toFixed(2)}</span>` : "");
         }
-        // Rank in the sorted list, then the facts; the one being sorted on comes first, in bold.
-        const reviews = `${item.count.toLocaleString()} reviews`;
-        const arrives = formatDelivery(item.delivery);
-        const stars = item.rating ? `${item.rating.toFixed(1)} out of 5` : "No rating";
-        const facts = key === "delivery" ? [arrives, reviews]
-          : key === "score" || key === "rating" ? [reviews, stars, arrives]
-          : [reviews, arrives];
-        const parts = facts.map((f, i) => (i === 0 ? `<b>${f}</b>` : `<span>${f}</span>`));
-        if (key !== "featured" && !hide) parts.unshift(`<span class="rsa-rank">#${shown}</span>`);
-        badge.innerHTML = parts.join('<i aria-hidden="true">·</i>');
         frag.appendChild(item.el);
       }
       if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
