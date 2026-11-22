@@ -15,6 +15,7 @@ Chrome extension (Manifest V3, no permissions) that adds a sort bar above Amazon
 - The Sort menu has two groups, so it's clear what gets ranked:
   - **All results, Amazon's ranking**: *Featured* and *Most reviews (all results)*. The second one is Amazon's hidden review sort across every page. It reloads the page and uses the sidebar department, or shows a department picker (Amazon ignores this sort without one).
   - **First N pages, re-sorted**: our sorts, which re-rank only the pages loaded (N follows the Pages setting).
+- A plain-language "how it works" card opens from the ⓘ next to the Review Sort name (click to open; click outside or press Escape to close).
 - **Saved defaults**: set the bar the way you like and click *Save as default*; it then applies to every search on that Amazon site. In the ⋯ menu, *Forget defaults* removes them, and *Clear sorting* shows Amazon's own page once without them. Stored in that Amazon site's localStorage, so each country site keeps its own.
 - Locale-aware number parsing (`12,345`, `12.345`, `12 345`, `12.3K`).
 

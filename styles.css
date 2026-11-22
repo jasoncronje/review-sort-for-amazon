@@ -23,7 +23,45 @@
   font: 400 13px/16px "Amazon Ember", Arial, sans-serif;
   color: var(--rsa-ink);
 }
-#rsa-bar .rsa-brand { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; white-space: nowrap; }
+#rsa-bar .rsa-brand { position: relative; display: inline-flex; align-items: center; gap: 7px; font-weight: 700; white-space: nowrap; }
+
+/* "How it works" button and card */
+#rsa-bar .rsa-info {
+  display: grid; place-items: center;
+  width: 22px; height: 22px; margin-left: -3px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--rsa-muted); cursor: pointer;
+}
+#rsa-bar .rsa-info svg { width: 15px; height: 15px; }
+#rsa-bar .rsa-info:hover,
+#rsa-bar .rsa-info[aria-expanded="true"] { background: var(--rsa-hover); color: var(--rsa-ink); }
+#rsa-bar .rsa-info:focus-visible { outline: 2px solid var(--rsa-focus); outline-offset: 1px; }
+#rsa-bar .rsa-tip {
+  position: absolute; left: -12px; top: calc(100% + 12px); z-index: 100;
+  width: 340px; max-width: calc(100vw - 32px);
+  padding: 16px 16px 14px;
+  background: #fff;
+  border: 1px solid var(--rsa-edge); /* taste-skill-ignore: popover edge, matches Amazon menus */
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(15, 17, 17, 0.18);
+  font-weight: 400; line-height: 19px; white-space: normal;
+}
+#rsa-bar .rsa-tip::before {
+  content: ""; position: absolute; left: 122px; top: -6px; width: 10px; height: 10px;
+  background: #fff; border-left: 1px solid var(--rsa-edge); border-top: 1px solid var(--rsa-edge);
+  transform: rotate(45deg);
+}
+#rsa-bar .rsa-tip h4 { margin: 0 0 4px; font: 700 15px/20px "Amazon Ember", Arial, sans-serif; color: var(--rsa-ink); }
+#rsa-bar .rsa-tip p { margin: 0 0 12px; color: var(--rsa-muted); }
+#rsa-bar .rsa-tip-row { display: grid; grid-template-columns: 28px 1fr; gap: 0 10px; margin-bottom: 12px; }
+#rsa-bar .rsa-tip-ic {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 7px;
+  background: var(--rsa-panel); border: 1px solid var(--rsa-hover); color: var(--rsa-ink); /* taste-skill-ignore: icon tile */
+}
+#rsa-bar .rsa-tip-ic svg { width: 16px; height: 16px; }
+#rsa-bar .rsa-tip-row b { display: block; margin-bottom: 1px; }
+#rsa-bar .rsa-tip-row div span { color: var(--rsa-muted); }
+#rsa-bar .rsa-tip-foot { padding-top: 11px; border-top: 1px solid var(--rsa-hover); color: var(--rsa-muted); font-size: 12px; line-height: 17px; }
+#rsa-bar .rsa-tip-foot b { color: var(--rsa-ink); }
 #rsa-bar .rsa-mark {
   display: grid; place-items: center;
   width: 18px; height: 18px; border-radius: 4px; background: #ff9900;
