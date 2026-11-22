@@ -209,7 +209,7 @@
 
   // ---------- state + actions ----------
 
-  const state = { extra: [], pagesLoaded: 1, busy: false, original: null };
+  const state = { extra: [], pagesLoaded: 1, busy: false, again: false, order: new Map() };
 
   function setStatus(text) {
     const s = document.getElementById("rsa-status");
@@ -225,7 +225,7 @@
     while (state.pagesLoaded < want) {
       const page = startPage + state.pagesLoaded;
       if (lastPage && page > lastPage) break;
-      setStatus(`Loading page ${page}…`);
+      setStatus(`Loading page ${page} of ${startPage + want - 1}…`);
       try {
         const cards = await fetchPage(page);
         if (!cards.length) break;
@@ -240,33 +240,36 @@
     return true;
   }
 
+  const val = (id) => document.getElementById(id).value;
+
+  // Runs on every control change. A change made while pages are loading re-runs once at the end.
   async function applySort() {
-    if (state.busy) return;
+    if (state.busy) { state.again = true; return; }
     const container = slot();
     if (!container) return;
     state.busy = true;
-    const btn = document.getElementById("rsa-apply");
-    btn.disabled = true;
+    const bar = document.getElementById(BAR_ID);
+    bar.classList.add("is-busy");
     try {
-      if (!state.original) state.original = [...container.querySelectorAll(RESULT_SEL)];
-      const key = document.getElementById("rsa-key").value;
-      const pages = +document.getElementById("rsa-pages").value;
-      const hideAds = document.getElementById("rsa-ads").checked;
-      const minRating = +document.getElementById("rsa-min").value;
-      const byDays = document.getElementById("rsa-by").value; // "" = any
+      const key = val("rsa-key");
+      const ok = await loadPages(+val("rsa-pages"));
+      const hideAds = document.getElementById("rsa-ads").getAttribute("aria-pressed") === "true";
+      const minRating = +val("rsa-min");
+      const byDays = val("rsa-by"); // "" = any
       const deadline = byDays === "" ? Infinity : +startOfToday() + +byDays * DAY_MS;
-
-      const ok = await loadPages(pages);
 
       const current = [...container.querySelectorAll(RESULT_SEL)];
       const unique = new Map();
       for (const e of [...current, ...state.extra]) {
+        if (!state.order.has(e.dataset.asin)) state.order.set(e.dataset.asin, state.order.size); // Amazon's own order
         if (unique.has(e.dataset.asin)) e.classList.add("rsa-hidden"); // same product listed twice (ad + organic)
         else unique.set(e.dataset.asin, e);
       }
       const all = [...unique.values()].map(readCard);
 
+      const pos = (x) => state.order.get(x.asin);
       const sorters = {
+        featured: (a, b) => pos(a) - pos(b),
         reviews: (a, b) => b.count - a.count || b.rating - a.rating,
         rating: (a, b) => b.rating - a.rating || b.count - a.count,
         score: (a, b) => b.score - a.score || b.count - a.count,
@@ -274,7 +277,7 @@
       };
       all.sort(sorters[key]);
 
-      // Insert all sorted cards before the first current result, so banners above stay put.
+      // Insert all cards before the first current result, so banners above stay put.
       const anchor = current[0] || null;
       const frag = document.createDocumentFragment();
       let shown = 0;
@@ -288,7 +291,8 @@
           badge.className = "rsa-badge";
           (item.el.querySelector(".s-card-container, .puis-card-container") || item.el).prepend(badge);
         }
-        badge.textContent = `${item.count.toLocaleString()} reviews · ${item.rating ? item.rating.toFixed(1) + "★" : "no rating"} · ${formatDelivery(item.delivery)}`;
+        const stars = item.rating ? `${item.rating.toFixed(1)} out of 5` : "No rating";
+        badge.innerHTML = `<b>${item.count.toLocaleString()}</b> reviews<span>${stars}</span><span>${formatDelivery(item.delivery)}</span>`;
         frag.appendChild(item.el);
       }
       if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
@@ -300,12 +304,18 @@
         if (el.compareDocumentPosition(container.querySelector(RESULT_SEL)) & Node.DOCUMENT_POSITION_PRECEDING) el.classList.add("rsa-hidden");
       });
 
-      if (ok) setStatus(`Sorted ${shown} products from ${state.pagesLoaded} page${state.pagesLoaded > 1 ? "s" : ""}.`);
+      if (ok) setStatus(`${shown.toLocaleString()} results from ${state.pagesLoaded} page${state.pagesLoaded > 1 ? "s" : ""}`);
       document.getElementById("rsa-reset").hidden = false;
     } finally {
       state.busy = false;
-      btn.disabled = false;
+      bar.classList.remove("is-busy");
+      if (state.again) { state.again = false; applySort(); }
     }
+  }
+
+  // Marks a dropdown as changed from its default, the way Amazon outlines an applied filter.
+  function markSet(select) {
+    select.closest(".rsa-dd").classList.toggle("is-set", select.selectedIndex !== 0);
   }
 
   function resetSort() {
@@ -352,9 +362,14 @@
       setStatus("Amazon's sort needs a department. Pick one in the left sidebar first.");
       return;
     }
+    const wrap = document.createElement("label");
+    wrap.className = "rsa-dd";
+    wrap.innerHTML = `<span class="rsa-dd-label">Department:</span>`;
     const sel = document.createElement("select");
     sel.id = "rsa-dept";
-    sel.innerHTML = `<option value="">Pick a department…</option>` +
+    wrap.append(sel);
+    wrap.insertAdjacentHTML("beforeend", CHEVRON);
+    sel.innerHTML = `<option value="">Choose one</option>` +
       opts.map((o) => `<option value="${o.alias}">${o.name.replace(/</g, "&lt;")}</option>`).join("");
     sel.addEventListener("change", () => {
       if (!sel.value) return;
@@ -364,47 +379,62 @@
       url.searchParams.delete("page");
       location.href = url.toString();
     });
-    document.getElementById("rsa-native").after(sel);
+    document.getElementById("rsa-native").after(wrap);
     setStatus("Amazon's sort needs a department.");
     sel.focus();
   }
 
   // ---------- UI ----------
 
+  const CHEVRON = `<svg class="rsa-chev" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dropdown = (id, label, title, options) => `
+      <label class="rsa-dd" title="${title}"><span class="rsa-dd-label">${label}</span>
+        <select id="${id}">${options.map(([v, t, sel]) => `<option value="${v}"${sel ? " selected" : ""}>${t}</option>`).join("")}</select>${CHEVRON}
+      </label>`;
+
   function buildBar() {
     const bar = document.createElement("div");
     bar.id = BAR_ID;
+    bar.setAttribute("role", "toolbar");
+    bar.setAttribute("aria-label", "Review sort");
     const nativeActive = params().get("sort") === "review-count-rank";
     bar.innerHTML = `
-      <span class="rsa-title">Sort</span>
-      <select id="rsa-key" title="What to sort by">
-        <option value="reviews">Most reviews</option>
-        <option value="score">Best rated (weighted)</option>
-        <option value="rating">Highest stars</option>
-        <option value="delivery">Soonest delivery</option>
-      </select>
-      <select id="rsa-pages" title="How many result pages to include">
-        ${[1, 2, 3, 5, 10].map((n) => `<option value="${n}"${n === 3 ? " selected" : ""}>${n === 1 ? "This page" : n + " pages"}</option>`).join("")}
-      </select>
-      <select id="rsa-min" title="Minimum star rating">
-        <option value="0">Any stars</option><option value="4">4★+</option><option value="4.5">4.5★+</option>
-      </select>
-      <select id="rsa-by" title="Latest acceptable arrival (soonest option shown on the card, free or paid)">
-        <option value="">Any delivery</option>
-        <option value="0">Arrives today</option>
-        <option value="1">By tomorrow</option>
-        <option value="2">Within 2 days</option>
-        <option value="3">Within 3 days</option>
-        <option value="7">Within a week</option>
-        <option value="14">Within 2 weeks</option>
-      </select>
-      <label class="rsa-check"><input type="checkbox" id="rsa-ads" checked> Hide sponsored</label>
-      <button id="rsa-apply" class="rsa-primary" type="button">Sort</button>
-      <button id="rsa-reset" type="button" hidden>Reset</button>
-      <button id="rsa-native" type="button" title="Amazon's own review-count sort across all pages. Needs a department; the top one is used if none is picked."
-        ${nativeActive ? "disabled" : ""}>${nativeActive ? "Amazon sort on" : "Amazon's sort"}</button>
-      <span id="rsa-status"></span>`;
-    bar.querySelector("#rsa-apply").addEventListener("click", applySort);
+      <div class="rsa-controls">
+        ${dropdown("rsa-key", "Sort by:", "Order of results", [
+          ["featured", "Featured"], ["reviews", "Most reviews"], ["score", "Best rated"],
+          ["rating", "Highest stars"], ["delivery", "Soonest delivery"],
+        ])}
+        ${dropdown("rsa-by", "Arrives:", "Soonest option on the card, free or paid", [
+          ["", "Any time"], ["0", "Today"], ["1", "By tomorrow"], ["2", "Within 2 days"],
+          ["3", "Within 3 days"], ["7", "Within a week"], ["14", "Within 2 weeks"],
+        ])}
+        ${dropdown("rsa-min", "Rating:", "Minimum star rating", [["0", "Any"], ["4", "4 stars & up"], ["4.5", "4.5 stars & up"]])}
+        ${dropdown("rsa-pages", "Include:", "Result pages to load and merge before sorting", [
+          ["1", "This page"], ["2", "2 pages"], ["3", "3 pages", true], ["5", "5 pages"], ["10", "10 pages"],
+        ])}
+        <button id="rsa-ads" class="rsa-chip" type="button" aria-pressed="false">
+          <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide sponsored
+        </button>
+      </div>
+      <div class="rsa-meta">
+        <span id="rsa-status" aria-live="polite"></span>
+        <button id="rsa-reset" class="rsa-link" type="button" hidden>Clear</button>
+        <button id="rsa-native" class="rsa-link" type="button" title="Amazon's own review-count sort across every page. Needs a department."
+          ${nativeActive ? "disabled" : ""}>${nativeActive ? "Using Amazon's review sort" : "Use Amazon's review sort"}</button>
+      </div>`;
+    // The "Include" dropdown is marked set only when it differs from its default (3 pages).
+    bar.querySelectorAll("select").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        if (sel.id === "rsa-pages") sel.closest(".rsa-dd").classList.toggle("is-set", sel.value !== "3");
+        else markSet(sel);
+        applySort();
+      });
+    });
+    bar.querySelector("#rsa-ads").addEventListener("click", (e) => {
+      const b = e.currentTarget;
+      b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+      applySort();
+    });
     bar.querySelector("#rsa-reset").addEventListener("click", resetSort);
     bar.querySelector("#rsa-native").addEventListener("click", nativeSort);
     return bar;
@@ -422,7 +452,7 @@
   // Amazon swaps result content in place on some filter clicks; re-inject when that happens.
   new MutationObserver(() => {
     if (!document.getElementById(BAR_ID)) {
-      state.extra = []; state.pagesLoaded = 1; state.original = null;
+      state.extra = []; state.pagesLoaded = 1; state.order = new Map();
       inject();
     }
   }).observe(document.body, { childList: true, subtree: true });

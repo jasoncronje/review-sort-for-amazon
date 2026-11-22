@@ -1,38 +1,124 @@
+/* Review Sort for Amazon: matches Amazon's own result-header controls
+   (the "Sort by: Featured" dropdown, filter chips, blue text links). */
 #rsa-bar {
+  --rsa-ink: #0f1111;
+  --rsa-muted: #565959;
+  --rsa-line: #888c8c;
+  --rsa-hover: #f7fafa;
+  --rsa-link: #2162a1;
+  --rsa-link-hover: #c7511f;
+  --rsa-set: #007185;
+  --rsa-set-bg: #edfdff;
+  --rsa-ring: #c8f3fa;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 8px 0 12px;
-  padding: 8px 12px;
-  border: 1px solid #d5d9d9;
-  border-radius: 8px;
-  background: #f7fafa;
-  font: 13px/1.3 "Amazon Ember", Arial, sans-serif;
-  color: #0f1111;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 4px 0 16px;
+  font: 400 12px/16px "Amazon Ember", Arial, sans-serif;
+  color: var(--rsa-ink);
 }
-#rsa-bar .rsa-title { font-weight: 700; }
-#rsa-bar select,
-#rsa-bar button {
-  font: inherit;
-  padding: 4px 10px;
-  border: 1px solid #d5d9d9;
+#rsa-bar .rsa-controls,
+#rsa-bar .rsa-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#rsa-bar .rsa-meta { gap: 16px; }
+
+/* Dropdowns: a white control with its label inside, like Amazon's "Sort by:" */
+#rsa-bar .rsa-dd {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 26px 0 11px;
+  border: 1px solid var(--rsa-line); /* taste-skill-ignore: form control, matches Amazon dropdown */
   border-radius: 8px;
   background: #fff;
   cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
-#rsa-bar button:disabled { opacity: 0.55; cursor: default; }
-#rsa-bar .rsa-primary { background: #ffd814; border-color: #fcd200; font-weight: 600; }
-#rsa-bar .rsa-primary:hover:not(:disabled) { background: #f7ca00; }
-#rsa-bar .rsa-check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-#rsa-status { color: #565959; }
+#rsa-bar .rsa-dd:hover { background: var(--rsa-hover); }
+#rsa-bar .rsa-dd:focus-within { border-color: var(--rsa-set); box-shadow: 0 0 0 3px var(--rsa-ring); } /* taste-skill-ignore: focus ring, Amazon convention */
+#rsa-bar .rsa-dd-label { color: var(--rsa-muted); white-space: nowrap; }
+#rsa-bar .rsa-dd select {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  padding: 0 0 0 4px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--rsa-ink);
+  cursor: pointer;
+  outline: none;
+  field-sizing: content; /* as wide as the chosen option, like Amazon's dropdown */
+}
+#rsa-bar .rsa-dd select::-ms-expand { display: none; }
+#rsa-bar .rsa-chev {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 10px;
+  height: 6px;
+  margin-top: -3px;
+  color: var(--rsa-ink);
+  pointer-events: none;
+}
+#rsa-bar .rsa-dd.is-set { border-color: var(--rsa-set); background: var(--rsa-set-bg); }
+
+/* Toggle chip */
+#rsa-bar .rsa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--rsa-line); /* taste-skill-ignore: form control, matches Amazon dropdown */
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: var(--rsa-ink);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+#rsa-bar .rsa-chip:hover { background: var(--rsa-hover); }
+#rsa-bar .rsa-chip:active { transform: translateY(1px); }
+#rsa-bar .rsa-chip:focus-visible { outline: none; border-color: var(--rsa-set); box-shadow: 0 0 0 3px var(--rsa-ring); } /* taste-skill-ignore: focus ring */
+#rsa-bar .rsa-tick { display: none; width: 12px; height: 10px; color: var(--rsa-set); }
+#rsa-bar .rsa-chip[aria-pressed="true"] { border-color: var(--rsa-set); background: var(--rsa-set-bg); font-weight: 700; }
+#rsa-bar .rsa-chip[aria-pressed="true"] .rsa-tick { display: block; }
+
+/* Text links */
+#rsa-bar .rsa-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--rsa-link);
+  cursor: pointer;
+}
+#rsa-bar .rsa-link:hover:not(:disabled) { color: var(--rsa-link-hover); text-decoration: underline; }
+#rsa-bar .rsa-link:focus-visible { outline: 2px solid var(--rsa-set); outline-offset: 2px; border-radius: 2px; }
+#rsa-bar .rsa-link:disabled { color: var(--rsa-muted); cursor: default; }
+#rsa-bar .rsa-link[hidden] { display: none; }
+
+#rsa-status { color: var(--rsa-muted); }
+#rsa-bar.is-busy #rsa-status { color: var(--rsa-ink); }
+#rsa-bar.is-busy .rsa-controls { opacity: 0.6; transition: opacity 0.15s ease; }
+
+/* Per-card summary: plain text in Amazon's secondary style, no pill */
 .rsa-badge {
-  display: inline-block;
-  margin: 4px 0;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: #e7f4f5;
-  color: #007185;
-  font: 600 12px/1.4 "Amazon Ember", Arial, sans-serif;
+  margin: 0;
+  padding: 6px 8px 6px; /* lines up with the card's title (8px inset) */
+  font: 400 12px/16px "Amazon Ember", Arial, sans-serif;
+  color: #565959;
 }
+.rsa-badge b { font-weight: 700; color: #0f1111; }
+.rsa-badge span::before { content: "·"; margin: 0 6px; }
+
 .rsa-hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  #rsa-bar *, #rsa-bar { transition: none !important; }
+  #rsa-bar .rsa-chip:active { transform: none; }
+}
