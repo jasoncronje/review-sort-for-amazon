@@ -311,7 +311,7 @@
       const ok = await loadPages(pages);
       const pagesUsed = Math.min(pages, state.pagesLoaded);
       const hideAds = pressed("rsa-ads");
-      const hideNoName = pressed("rsa-noname");
+      const hideNoName = noNameEnabled() && pressed("rsa-noname");
       const minRating = +val("rsa-min");
       const byDays = val("rsa-by"); // "" = any
       const deadline = byDays === "" ? Infinity : +daysFromToday(+byDays);
@@ -409,6 +409,18 @@
   const BASE = { key: "featured", by: "", min: "0", pages: "3", ads: false, noname: false };
   const FIELDS = { key: "rsa-key", by: "rsa-by", min: "rsa-min", pages: "rsa-pages" };
 
+  // Add-on settings (not search defaults). Kept per Amazon site, like the defaults.
+  const SETTINGS_KEY = "rsa-settings-v1";
+  const SETTINGS_BASE = { noNameFilter: false }; // experimental features are off until turned on
+  function loadSettings() {
+    try { return { ...SETTINGS_BASE, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) }; }
+    catch { return { ...SETTINGS_BASE }; }
+  }
+  function saveSettings(v) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)); return true; } catch { return false; }
+  }
+  const noNameEnabled = () => loadSettings().noNameFilter === true;
+
   function loadDefaults() {
     try { const v = JSON.parse(localStorage.getItem(STORE_KEY)); return v && typeof v === "object" ? { ...BASE, ...v } : null; }
     catch { return null; }
@@ -424,7 +436,7 @@
     const v = {};
     for (const [k, id] of Object.entries(FIELDS)) v[k] = val(id);
     v.ads = pressed("rsa-ads");
-    v.noname = pressed("rsa-noname");
+    v.noname = noNameEnabled() && pressed("rsa-noname");
     return v;
   }
   function writeControls(v) {
@@ -574,9 +586,9 @@
           <h4>Find what people actually buy and like</h4>
           <p>Amazon puts popular and sponsored items first. Review Sort reorders the results so the most trusted products rise to the top.</p>
           <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 10h15M10 2.5c2.2 2.4 2.2 12.6 0 15M10 2.5c-2.2 2.4-2.2 12.6 0 15" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><div><b>Amazon Sort</b><span>Amazon lines up every matching product by number of reviews. The most thorough option, but it can only sort by reviews.</span></div></div>
-          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>Custom Sort</b><span>Sorts Amazon doesn't offer: best rated, highest stars and soonest delivery, plus filters for arrival date, ads and no-name brands. To do this, Review Sort reorders the first pages you'd see (you pick how many with Pages).</span></div></div>
+          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>Custom Sort</b><span>Sorts Amazon doesn't offer: best rated, highest stars and soonest delivery, plus filters for arrival date and ads. To do this, Review Sort reorders the first pages you'd see (you pick how many with Pages).</span></div></div>
           <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><div><b>Best rated</b><span>Weighs stars against how many people gave them, so 5 stars from 3 people won't beat 4.7 stars from 20,000.</span></div></div>
-          <div class="rsa-tip-foot">Like your setup? Click <b>Save as default</b> and it's used on every search.</div>
+          <div class="rsa-tip-foot">Like your setup? Click <b>Save as default</b> and it's used on every search. More options are under <b>⋯ → Settings</b>.</div>
         </div>
       </div>
       <div class="rsa-controls">
@@ -605,7 +617,7 @@
         <button id="rsa-ads" class="rsa-chip" type="button" aria-pressed="false">
           <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide ads
         </button>
-        <button id="rsa-noname" title="Hides brands whose US trademark is owned from China, except well-known ones like Anker or Xiaomi" class="rsa-chip" type="button" aria-pressed="false">
+        <button id="rsa-noname" ${noNameEnabled() ? "" : "hidden"} title="Hides brands whose US trademark is owned from China, except well-known ones like Anker or Xiaomi" class="rsa-chip" type="button" aria-pressed="false">
           <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide no-name brands
         </button>
       </div>
@@ -619,6 +631,7 @@
           <div id="rsa-menu" class="rsa-menu" role="menu" hidden>
             <button id="rsa-reset" role="menuitem" type="button" hidden>Clear sorting</button>
             <button id="rsa-forget" role="menuitem" type="button" hidden>Forget defaults</button>
+            <button id="rsa-open-settings" role="menuitem" type="button">Settings</button>
           </div>
         </div>
       </div>`;
@@ -661,6 +674,7 @@
       if (!tip.hidden) { setTip(false); info.focus(); }
     });
     bar.querySelector("#rsa-reset").addEventListener("click", resetSort);
+    bar.querySelector("#rsa-open-settings").addEventListener("click", openSettings);
     bar.querySelector("#rsa-save").addEventListener("click", () => {
       setStatus(saveDefaults(readControls()) ? "Saved. These settings now apply to every search." : "Couldn't save: this browser blocks site storage.");
       refreshDefaultsUI();
@@ -672,6 +686,116 @@
       refreshDefaultsUI();
     });
     return bar;
+  }
+
+  // ---------- settings ----------
+  // A dialog on the Amazon page itself, so it works the same in the extension and as a
+  // userscript (which has no extension pages). Opened from ⋯ -> Settings.
+  const DIALOG_ID = "rsa-dialog";
+
+  function openSettings() {
+    document.getElementById(DIALOG_ID)?.remove();
+    const dlg = document.createElement("dialog");
+    dlg.id = DIALOG_ID;
+    dlg.setAttribute("aria-labelledby", "rsa-dialog-title");
+    const site = location.hostname.replace(/^www\./, "");
+    dlg.innerHTML = `<div class="rsa-dlg-body">
+      <div class="rsa-dlg-head">
+        <h2 id="rsa-dialog-title">Review Sort settings</h2>
+        <button type="button" class="rsa-dlg-x" aria-label="Close"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      </div>
+      <section>
+        <h3>Defaults for every search</h3>
+        <p class="rsa-dlg-note">Applied each time you search on ${site}.</p>
+        <div class="rsa-dlg-fields"></div>
+        <label class="rsa-dlg-check"><input type="checkbox" id="rsa-d-ads"> Hide ads</label>
+        <label class="rsa-dlg-check" id="rsa-d-noname-row"><input type="checkbox" id="rsa-d-noname"> Hide no-name brands</label>
+        <div class="rsa-dlg-actions">
+          <button type="button" class="rsa-btn-primary" id="rsa-d-save">Save defaults</button>
+          <button type="button" class="rsa-btn" id="rsa-d-forget">Use Amazon's normal results</button>
+          <span class="rsa-dlg-msg" role="status"></span>
+        </div>
+      </section>
+      <section class="rsa-dlg-exp">
+        <h3>Experimental <span class="rsa-tag">Beta</span></h3>
+        <label class="rsa-switch-row">
+          <span><b>No-name brand filter</b>
+            <span class="rsa-dlg-note">Adds a "Hide no-name brands" button. It hides brands whose US trademark is owned from China, except well-known ones like Anker or Xiaomi. It can miss unbranded listings and now and then hide a real brand.</span></span>
+          <input type="checkbox" role="switch" id="rsa-d-exp-noname" class="rsa-switch">
+        </label>
+      </section></div>`;
+    // The default fields reuse the bar's own dropdowns, so the choices always match.
+    const fields = dlg.querySelector(".rsa-dlg-fields");
+    const labels = { key: "Sort", by: "Arrives", min: "Stars", pages: "Pages" };
+    for (const [k, id] of Object.entries(FIELDS)) {
+      const sel = document.getElementById(id).cloneNode(true);
+      sel.id = "rsa-d-" + k;
+      sel.querySelectorAll("[id]").forEach((e) => e.removeAttribute("id"));
+      const row = document.createElement("label");
+      row.className = "rsa-dlg-field";
+      row.innerHTML = `<span>${labels[k]}</span>`;
+      row.append(sel);
+      fields.append(row);
+    }
+    const $ = (sel) => dlg.querySelector(sel);
+    const msg = (t) => { $(".rsa-dlg-msg").textContent = t; };
+    const fill = () => {
+      const v = loadDefaults() || BASE;
+      for (const k of Object.keys(FIELDS)) {
+        const sel = $("#rsa-d-" + k);
+        sel.value = v[k];
+        if (sel.selectedIndex < 0) sel.value = BASE[k];
+      }
+      $("#rsa-d-ads").checked = !!v.ads;
+      $("#rsa-d-noname").checked = !!v.noname && noNameEnabled();
+      $("#rsa-d-noname-row").hidden = !noNameEnabled();
+      $("#rsa-d-exp-noname").checked = noNameEnabled();
+    };
+    fill();
+
+    $("#rsa-d-save").addEventListener("click", () => {
+      const v = { ads: $("#rsa-d-ads").checked, noname: noNameEnabled() && $("#rsa-d-noname").checked };
+      for (const k of Object.keys(FIELDS)) v[k] = $("#rsa-d-" + k).value;
+      if (!saveDefaults(v)) { msg("Couldn't save: this browser blocks site storage."); return; }
+      if (v.key === "native" && !nativeActive()) {
+        msg("Saved. Amazon's own ranking starts on your next search.");
+        v.key = val("rsa-key"); // switching to it needs a new page; leave this one as is
+      } else if (v.key !== "native" && nativeActive()) {
+        msg("Saved. Applies from your next search.");
+        v.key = "native"; // this page is Amazon's ranking; leave it
+      } else msg("Saved.");
+      writeControls(v);
+      state.touched = false;
+      refreshDefaultsUI();
+      applySort();
+    });
+    $("#rsa-d-forget").addEventListener("click", () => {
+      saveDefaults(null);
+      state.touched = false;
+      refreshDefaultsUI();
+      fill();
+      msg("Defaults cleared. Searches open as Amazon shows them.");
+    });
+    $("#rsa-d-exp-noname").addEventListener("change", (e) => {
+      const on = e.target.checked;
+      saveSettings({ ...loadSettings(), noNameFilter: on });
+      const chip = document.getElementById("rsa-noname");
+      chip.hidden = !on;
+      if (!on && chip.getAttribute("aria-pressed") === "true") {
+        chip.setAttribute("aria-pressed", "false");
+        applySort();
+      }
+      $("#rsa-d-noname-row").hidden = !on;
+      if (!on) $("#rsa-d-noname").checked = false;
+      refreshDefaultsUI();
+      msg(on ? "No-name brand filter turned on. Its button is now in the bar." : "No-name brand filter turned off.");
+    });
+    const close = () => { dlg.close(); dlg.remove(); document.getElementById("rsa-more")?.focus(); };
+    $(".rsa-dlg-x").addEventListener("click", close);
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) close(); }); // backdrop (the body fills the dialog box)
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); }); // Escape
+    document.body.append(dlg);
+    dlg.showModal();
   }
 
   function inject() {
@@ -689,6 +813,7 @@
     const saved = loadDefaults();
     let start = saved && !skip ? { ...saved } : { ...BASE };
     if (pending) { start.key = pending; state.touched = true; }
+    if (!noNameEnabled()) start.noname = false;
     if (nativeActive()) start.key = "native";
     else if (start.key === "native") {
       // A saved default of Amazon's ranking: go there when Amazon can do it without asking.

@@ -1,16 +1,19 @@
 /* Review Sort for Amazon: one quiet panel above the results. Controls are borderless
    until hovered; the ones you've changed turn white and lift, so they stand out. */
-#rsa-bar {
+#rsa-bar, #rsa-dialog {
   --rsa-ink: #0f1111;
   --rsa-muted: #565959;
   --rsa-panel: #f7fafa;
   --rsa-edge: #d5d9d9;
+  --rsa-line: #888c8c;
   --rsa-hover: #e3e6e6;
   --rsa-link: #2162a1;
   --rsa-link-hover: #c7511f;
   --rsa-focus: #007185;
   --rsa-ring: #c8f3fa;
   --rsa-lift: 0 1px 3px rgba(15, 17, 17, 0.15);
+}
+#rsa-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -178,4 +181,72 @@
 @media (prefers-reduced-motion: reduce) {
   #rsa-bar *, #rsa-bar { transition: none !important; }
   #rsa-bar .rsa-chip:active { transform: none; }
+}
+
+/* Settings dialog */
+#rsa-dialog {
+  color-scheme: light;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--rsa-ink);
+  box-shadow: 0 12px 40px rgba(15, 17, 17, 0.28);
+  font: 400 14px/20px "Amazon Ember", Arial, sans-serif;
+}
+#rsa-dialog::backdrop { background: rgba(15, 17, 17, 0.45); }
+#rsa-dialog [hidden] { display: none !important; }
+#rsa-dialog .rsa-dlg-body { padding: 18px 20px 20px; }
+#rsa-dialog .rsa-dlg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+#rsa-dialog h2 { margin: 0; font: 700 18px/24px "Amazon Ember", Arial, sans-serif; }
+#rsa-dialog h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 2px; font: 700 14px/20px "Amazon Ember", Arial, sans-serif; }
+#rsa-dialog section { padding: 14px 0; border-top: 1px solid var(--rsa-hover); }
+#rsa-dialog .rsa-dlg-head + section { border-top: 0; padding-top: 6px; }
+#rsa-dialog .rsa-dlg-note { display: block; margin: 0; color: var(--rsa-muted); font-size: 13px; line-height: 18px; }
+#rsa-dialog .rsa-dlg-x {
+  display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--rsa-muted); cursor: pointer;
+}
+#rsa-dialog .rsa-dlg-x svg { width: 12px; height: 12px; }
+#rsa-dialog .rsa-dlg-x:hover { background: var(--rsa-hover); color: var(--rsa-ink); }
+#rsa-dialog .rsa-dlg-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 12px 0 10px; }
+#rsa-dialog .rsa-dlg-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; }
+#rsa-dialog .rsa-dlg-field select {
+  height: 32px; padding: 0 8px;
+  border: 1px solid var(--rsa-line); /* taste-skill-ignore: form control, matches Amazon dropdown */
+  border-radius: 8px; background: #fff; font: 400 13px "Amazon Ember", Arial, sans-serif; color: var(--rsa-ink);
+}
+#rsa-dialog .rsa-dlg-check { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; cursor: pointer; }
+#rsa-dialog .rsa-dlg-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--rsa-focus); }
+#rsa-dialog .rsa-dlg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 14px; }
+#rsa-dialog .rsa-btn-primary, #rsa-dialog .rsa-btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; font: 400 13px "Amazon Ember", Arial, sans-serif; color: var(--rsa-ink); cursor: pointer;
+}
+#rsa-dialog .rsa-btn-primary { border: 1px solid #fcd200; background: #ffd814; } /* taste-skill-ignore: Amazon's primary button */
+#rsa-dialog .rsa-btn-primary:hover { background: #f7ca00; }
+#rsa-dialog .rsa-btn { border: 1px solid var(--rsa-edge); background: #fff; } /* taste-skill-ignore: Amazon's secondary button */
+#rsa-dialog .rsa-btn:hover { background: var(--rsa-panel); }
+#rsa-dialog button:focus-visible, #rsa-dialog select:focus-visible, #rsa-dialog input:focus-visible { outline: 2px solid var(--rsa-focus); outline-offset: 2px; }
+#rsa-dialog .rsa-dlg-msg { color: var(--rsa-muted); font-size: 13px; }
+#rsa-dialog .rsa-tag {
+  padding: 1px 7px; border-radius: 10px; background: #fff3cd; color: #8a5300;
+  font-size: 11px; font-weight: 700; line-height: 16px; letter-spacing: 0.02em;
+}
+#rsa-dialog .rsa-switch-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-top: 10px; cursor: pointer; }
+#rsa-dialog .rsa-switch-row b { display: block; font-size: 14px; }
+#rsa-dialog .rsa-switch {
+  -webkit-appearance: none; appearance: none; flex: none; position: relative;
+  width: 36px; height: 20px; margin: 2px 0 0; border-radius: 10px; background: #bbbfbf; cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+#rsa-dialog .rsa-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(15, 17, 17, 0.3); transition: transform 0.15s ease;
+}
+#rsa-dialog .rsa-switch:checked { background: var(--rsa-focus); }
+#rsa-dialog .rsa-switch:checked::after { transform: translateX(16px); }
+@media (prefers-reduced-motion: reduce) {
+  #rsa-dialog .rsa-switch, #rsa-dialog .rsa-switch::after { transition: none; }
 }

@@ -16,7 +16,8 @@ Chrome extension (Manifest V3, no permissions) that adds a sort bar above Amazon
   - **Amazon Sort**: *Featured* and *Most reviews (all results)*. The second one is Amazon's hidden review sort across every page. It reloads the page and uses the sidebar department, or shows a department picker (Amazon ignores this sort without one).
   - **Custom Sort (first N pages)**: sorts and filters Amazon doesn't offer (best rated, highest stars, soonest delivery, arrival-date and ad filters), which re-rank only the pages loaded (N follows the Pages setting).
 - A plain-language "how it works" card opens from the ⓘ next to the Review Sort name (click to open; click outside or press Escape to close).
-- **Hide no-name brands**: hides brands whose US trademark is owned from China, except well-known ones. Three lists in `data/`:
+- **Settings** (⋯ → Settings): edit the defaults for every search, and turn on experimental features. Kept in that Amazon site's localStorage, like the defaults.
+- **Hide no-name brands** (experimental, off by default; turn on in Settings → Experimental): hides brands whose US trademark is owned from China, except well-known ones. Three lists in `data/`:
   - `amazon_brand_candidates_1000.csv`: 1,000 brands seen most in Amazon reviews (always hidden).
   - `cn_trademarks.txt.gz`: ~712k live US trademark names whose current owner has a China address, minus names also registered from other countries and names made only of common words. Built by `tools/fetch-trademarks.py` from the public USPTO case files (Hugging Face `illeatmyhat/uspto-trademarks`, data through 2026-10-31). Shipped as a ~1.7 MB Bloom filter (about 1 wrong hit per 10,000 lookups).
   - `keep-brands.txt`: well-known brands never hidden (Anker, UGREEN, Xiaomi, Govee...). Edit it, then run `./gen-brands.py`.
