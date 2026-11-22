@@ -171,7 +171,12 @@
       const ok = await loadPages(pages);
 
       const current = [...container.querySelectorAll(RESULT_SEL)];
-      const all = [...new Map([...current, ...state.extra].map((e) => [e.dataset.asin, e])).values()].map(readCard);
+      const unique = new Map();
+      for (const e of [...current, ...state.extra]) {
+        if (unique.has(e.dataset.asin)) e.classList.add("rsa-hidden"); // same product listed twice (ad + organic)
+        else unique.set(e.dataset.asin, e);
+      }
+      const all = [...unique.values()].map(readCard);
 
       const sorters = {
         reviews: (a, b) => b.count - a.count || b.rating - a.rating,
@@ -237,7 +242,7 @@
     if (!hasDepartment()) {
       const dept = topDepartmentParams();
       if (!dept) {
-        setStatus("Amazon's sort needs a department. Pick one in the left sidebar, or use Sort here.");
+        showDepartmentPicker();
         return;
       }
       for (const [k, v] of Object.entries(dept)) url.searchParams.set(k, v);
@@ -245,6 +250,34 @@
     url.searchParams.set("sort", "review-count-rank");
     url.searchParams.delete("page");
     location.href = url.toString();
+  }
+
+  // Broad searches have no department in the sidebar. Offer Amazon's own list from the
+  // search box dropdown ("search-alias=electronics" -> i=electronics).
+  function showDepartmentPicker() {
+    if (document.getElementById("rsa-dept")) return;
+    const opts = [...document.querySelectorAll("select#searchDropdownBox option")]
+      .map((o) => ({ alias: (o.value.match(/search-alias=([\w-]+)/) || [])[1], name: o.textContent.trim() }))
+      .filter((o) => o.alias && o.alias !== "aps");
+    if (!opts.length) {
+      setStatus("Amazon's sort needs a department. Pick one in the left sidebar first.");
+      return;
+    }
+    const sel = document.createElement("select");
+    sel.id = "rsa-dept";
+    sel.innerHTML = `<option value="">Pick a department…</option>` +
+      opts.map((o) => `<option value="${o.alias}">${o.name.replace(/</g, "&lt;")}</option>`).join("");
+    sel.addEventListener("change", () => {
+      if (!sel.value) return;
+      const url = new URL(location.href);
+      url.searchParams.set("i", sel.value);
+      url.searchParams.set("sort", "review-count-rank");
+      url.searchParams.delete("page");
+      location.href = url.toString();
+    });
+    document.getElementById("rsa-native").after(sel);
+    setStatus("Amazon's sort needs a department.");
+    sel.focus();
   }
 
   // ---------- UI ----------
