@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Review Sort for Amazon
 // @namespace    review-sort-amazon
-// @version      1.7.0
+// @version      1.7.1
 // @description  Sort Amazon search results by reviews, rating or weighted score across pages.
 // @match        *://*.amazon.com/*
 // @match        *://*.amazon.ca/*
@@ -492,7 +492,7 @@
   // The second group's label says how much of the search gets re-sorted.
   function labelOurs() {
     const n = +val("rsa-pages");
-    document.getElementById("rsa-ours").setAttribute("label", n === 1 ? "This page, re-sorted" : `First ${n} pages, re-sorted`);
+    document.getElementById("rsa-ours").setAttribute("label", n === 1 ? "Custom Sort (this page)" : `Custom Sort (first ${n} pages)`);
   }
 
   // Moving into or out of Amazon's own ranking needs a new page from Amazon.
@@ -526,8 +526,8 @@
         <div id="rsa-tip" class="rsa-tip" role="dialog" aria-label="How Review Sort works" hidden>
           <h4>Find what people actually buy and like</h4>
           <p>Amazon puts popular and sponsored items first. Review Sort reorders the results so the most trusted products rise to the top.</p>
-          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 10h15M10 2.5c2.2 2.4 2.2 12.6 0 15M10 2.5c-2.2 2.4-2.2 12.6 0 15" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><div><b>All results</b><span>Amazon lines up every matching product by number of reviews. The most thorough option, but it can only sort by reviews.</span></div></div>
-          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>First few pages</b><span>Review Sort takes the first pages you'd see and reorders them right here, by reviews, stars, or fastest delivery.</span></div></div>
+          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 10h15M10 2.5c2.2 2.4 2.2 12.6 0 15M10 2.5c-2.2 2.4-2.2 12.6 0 15" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><div><b>Amazon Sort</b><span>Amazon lines up every matching product by number of reviews. The most thorough option, but it can only sort by reviews.</span></div></div>
+          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>Custom Sort</b><span>Review Sort takes the first pages you'd see (set by Pages) and reorders them right here, by reviews, stars, or fastest delivery.</span></div></div>
           <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><div><b>Best rated</b><span>Weighs stars against how many people gave them, so 5 stars from 3 people won't beat 4.7 stars from 20,000.</span></div></div>
           <div class="rsa-tip-foot">Like your setup? Click <b>Save as default</b> and it's used on every search.</div>
         </div>
@@ -535,11 +535,11 @@
       <div class="rsa-controls">
         <label class="rsa-dd" title="Order of results"><span class="rsa-dd-label">Sort</span>
           <select id="rsa-key">
-            <optgroup label="All results, Amazon's ranking">
+            <optgroup label="Amazon Sort">
               <option value="featured">Featured</option>
               <option value="native">Most reviews (all results)</option>
             </optgroup>
-            <optgroup id="rsa-ours" label="First 3 pages, re-sorted">
+            <optgroup id="rsa-ours" label="Custom Sort (first 3 pages)">
               <option value="reviews">Most reviews</option>
               <option value="score">Best rated</option>
               <option value="rating">Highest stars</option>
