@@ -147,24 +147,54 @@
     );
   }
 
-  // "No-name" brands: a list of 1,000 marketplace brands (see gen-brands.py), matched
-  // against the card's brand line or the start of its title.
-  const NO_NAME = new Set((globalThis.RSA_NO_NAME_BRANDS || "").split("|").filter(Boolean));
-  const normBrand = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  // "No-name" brands (see gen-brands.py): a hand-made list of 1,000 brands plus ~717k
+  // China-owned US trademark names packed in a Bloom filter. Well-known brands are kept.
+  // A card matches on its brand line, or the first 1-3 words of its title.
+  const brandSet = (s) => new Set((s || "").split("|").filter(Boolean));
+  const NO_NAME = brandSet(globalThis.RSA_NO_NAME_BRANDS);
+  const KEEP = brandSet(globalThis.RSA_KEEP_BRANDS);
+  const MARKS = (() => {
+    const f = globalThis.RSA_CN_MARKS;
+    if (!f) return null;
+    const raw = atob(f.bits), bits = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bits[i] = raw.charCodeAt(i);
+    return { m: f.m, k: f.k, bits };
+  })();
+  function fnv(s, seed) {
+    let h = seed;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
+    return h;
+  }
+  function inMarks(key) {
+    if (!MARKS) return false;
+    const h1 = fnv(key, 2166136261), h2 = (fnv(key, 0x9747b28c) | 1) >>> 0;
+    for (let i = 0; i < MARKS.k; i++) {
+      const p = (h1 + i * h2) % MARKS.m;
+      if (!(MARKS.bits[p >> 3] & (1 << (p & 7)))) return false;
+    }
+    return true;
+  }
+  const brandWords = (s) => s.toUpperCase().match(/[A-Z0-9]+/g) || [];
+  // null = can't tell, true = no-name, false = known brand
+  function judgeBrand(ws) {
+    for (let n = 1; n <= Math.min(3, ws.length); n++) {
+      const part = ws.slice(0, n), squashed = part.join("");
+      if (KEEP.has(squashed)) return false;
+      if (squashed.length >= 3 && NO_NAME.has(squashed)) return true;
+      if (squashed.length >= 4 && inMarks(part.join(" "))) return true;
+    }
+    return null;
+  }
   function isNoName(card) {
-    if (!NO_NAME.size) return false;
     const recipe = card.querySelector('[data-cy="title-recipe"]');
     // Some layouts (fashion, home) print the brand on its own line above the title.
     const brandLine = recipe?.querySelector("h2.a-size-mini span, .a-row > span.a-size-base-plus.a-color-base, .a-row > span.a-size-medium.a-color-base");
-    if (brandLine && !brandLine.closest("a") && NO_NAME.has(normBrand(brandLine.textContent))) return true;
-    const title = (card.querySelector("h2")?.getAttribute("aria-label") || card.querySelector("h2")?.textContent || "").trim();
-    const words = title.split(/\s+/).slice(0, 4);
-    let joined = "";
-    for (const w of words) {
-      joined += normBrand(w);
-      if (joined.length >= 3 && NO_NAME.has(joined)) return true;
+    if (brandLine && !brandLine.closest("a")) {
+      const verdict = judgeBrand(brandWords(brandLine.textContent));
+      if (verdict !== null) return verdict;
     }
-    return false;
+    const h2 = card.querySelector("h2");
+    return !!judgeBrand(brandWords(h2?.getAttribute("aria-label") || h2?.textContent || ""));
   }
 
   // Bayesian average: pulls low-review products toward a prior so 5.0 from 3 reviews
@@ -549,7 +579,7 @@
         <button id="rsa-ads" class="rsa-chip" type="button" aria-pressed="false">
           <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide ads
         </button>
-        <button id="rsa-noname" title="Hides 1,000 common marketplace brands (US trademarks registered to companies in China)" class="rsa-chip" type="button" aria-pressed="false">
+        <button id="rsa-noname" title="Hides brands whose US trademark is owned from China, except well-known ones like Anker or Xiaomi" class="rsa-chip" type="button" aria-pressed="false">
           <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide no-name brands
         </button>
       </div>
