@@ -66,6 +66,88 @@
     return r > 0 && r <= 5 ? r : 0;
   }
 
+  // ---------- delivery date ----------
+
+  const DAY_MS = 864e5;
+  const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+
+  // Month names for English plus the page's own language (amazon.de -> "Dez.", amazon.fr -> "déc.").
+  const MONTHS = (() => {
+    const map = new Map();
+    const langs = [...new Set(["en", document.documentElement.lang || "en"])];
+    for (const lang of langs) {
+      for (const month of ["short", "long"]) {
+        let fmt;
+        try { fmt = new Intl.DateTimeFormat(lang, { month }); } catch { continue; }
+        for (let m = 0; m < 12; m++) {
+          const name = fmt.format(new Date(2026, m, 15)).toLowerCase().replace(/\.$/, "");
+          map.set(name, m);
+        }
+      }
+    }
+    map.set("sept", 8);
+    return map;
+  })();
+  const MONTH_RE = [...MONTHS.keys()].sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const MD_RANGE = new RegExp(`(${MONTH_RE})\\.?\\s+(\\d{1,2})(?:\\s*[-–]\\s*(?:(${MONTH_RE})\\.?\\s+)?(\\d{1,2}))?`, "gi");
+  const DM_RANGE = new RegExp(`(\\d{1,2})\\.?\\s*(?:[-–]\\s*(\\d{1,2})\\.?\\s*)?(${MONTH_RE})`, "gi");
+
+  // Month/day with no year: pick the year that puts it nearest after today (Dec -> Jan rollover).
+  function dateFrom(month, day) {
+    const today = startOfToday();
+    const d = new Date(today.getFullYear(), month, day);
+    if (d < today - 60 * DAY_MS) d.setFullYear(d.getFullYear() + 1);
+    return d;
+  }
+
+  // Latest date one delivery option promises ("Nov 30 - Dec 2" -> Dec 2), or null.
+  function optionDate(text) {
+    const t = text.toLowerCase();
+    if (/\btoday\b|\bheute\b|aujourd|\bhoy\b|\boggi\b|vandaag/.test(t)) return startOfToday();
+    if (/\btomorrow\b|\bovernight\b|\bmorgen\b|demain|mañana|domani/.test(t)) return new Date(+startOfToday() + DAY_MS);
+    let best = null;
+    for (const m of t.matchAll(MD_RANGE)) {
+      const m1 = MONTHS.get(m[1].replace(/\.$/, ""));
+      const end = m[4] ? dateFrom(m[3] ? MONTHS.get(m[3].replace(/\.$/, "")) : m1, +m[4]) : dateFrom(m1, +m[2]);
+      if (!best || end > best) best = end;
+    }
+    if (!best) {
+      for (const m of t.matchAll(DM_RANGE)) {
+        const end = dateFrom(MONTHS.get(m[3].replace(/\.$/, "")), +(m[2] || m[1]));
+        if (!best || end > best) best = end;
+      }
+    }
+    return best;
+  }
+
+  // Soonest arrival across the card's delivery options (free, or paid "fastest delivery").
+  // Returns ms timestamp of the day, or Infinity when the card shows no date.
+  function getDeliveryDate(card) {
+    const block = card.querySelector('[data-cy="delivery-recipe"], .udm-delivery-block, .s-align-children-center');
+    if (!block) return Infinity;
+    // Bold spans hold one date per option; fall back to the whole block when they don't.
+    let soonest = Infinity;
+    for (const s of block.querySelectorAll("span.a-text-bold")) {
+      const d = optionDate(s.textContent);
+      if (d && +d < soonest) soonest = +d;
+    }
+    if (!isFinite(soonest)) {
+      const text = block.textContent.replace(/\.udm[^}]*\}/g, " ");
+      const d = optionDate(text);
+      if (d) soonest = +d;
+    }
+    return soonest;
+  }
+
+  function formatDelivery(ts) {
+    if (!isFinite(ts)) return "no date";
+    const days = Math.round((ts - startOfToday()) / DAY_MS);
+    if (days <= 0) return "arrives today";
+    if (days === 1) return "arrives tomorrow";
+    return "arrives " + new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  }
+
   function isSponsored(card) {
     return (
       card.classList.contains("AdHolder") ||
@@ -99,13 +181,17 @@
     card.dataset.rsaReviews = String(getReviewCount(card));
     card.dataset.rsaRating = String(getRating(card));
     card.dataset.rsaSponsored = isSponsored(card) ? "1" : "0";
+    card.dataset.rsaDelivery = String(getDeliveryDate(card));
   }
 
   function readCard(card) {
     decorate(card);
     const count = +card.dataset.rsaReviews;
     const rating = +card.dataset.rsaRating;
-    return { el: card, asin: card.dataset.asin, count, rating, score: weightedScore(rating, count), sponsored: card.dataset.rsaSponsored === "1" };
+    return {
+      el: card, asin: card.dataset.asin, count, rating, score: weightedScore(rating, count),
+      sponsored: card.dataset.rsaSponsored === "1", delivery: +card.dataset.rsaDelivery,
+    };
   }
 
   async function fetchPage(n) {
@@ -167,6 +253,8 @@
       const pages = +document.getElementById("rsa-pages").value;
       const hideAds = document.getElementById("rsa-ads").checked;
       const minRating = +document.getElementById("rsa-min").value;
+      const byDays = document.getElementById("rsa-by").value; // "" = any
+      const deadline = byDays === "" ? Infinity : +startOfToday() + +byDays * DAY_MS;
 
       const ok = await loadPages(pages);
 
@@ -182,6 +270,7 @@
         reviews: (a, b) => b.count - a.count || b.rating - a.rating,
         rating: (a, b) => b.rating - a.rating || b.count - a.count,
         score: (a, b) => b.score - a.score || b.count - a.count,
+        delivery: (a, b) => (a.delivery - b.delivery) || b.score - a.score, // Infinity - Infinity is NaN -> falls through
       };
       all.sort(sorters[key]);
 
@@ -190,7 +279,7 @@
       const frag = document.createDocumentFragment();
       let shown = 0;
       for (const item of all) {
-        const hide = (hideAds && item.sponsored) || (minRating && item.rating < minRating);
+        const hide = (hideAds && item.sponsored) || (minRating && item.rating < minRating) || item.delivery > deadline;
         item.el.classList.toggle("rsa-hidden", !!hide);
         if (!hide) shown++;
         let badge = item.el.querySelector(".rsa-badge");
@@ -199,7 +288,7 @@
           badge.className = "rsa-badge";
           (item.el.querySelector(".s-card-container, .puis-card-container") || item.el).prepend(badge);
         }
-        badge.textContent = `${item.count.toLocaleString()} reviews · ${item.rating ? item.rating.toFixed(1) + "★" : "no rating"}`;
+        badge.textContent = `${item.count.toLocaleString()} reviews · ${item.rating ? item.rating.toFixed(1) + "★" : "no rating"} · ${formatDelivery(item.delivery)}`;
         frag.appendChild(item.el);
       }
       if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
@@ -292,12 +381,22 @@
         <option value="reviews">Most reviews</option>
         <option value="score">Best rated (weighted)</option>
         <option value="rating">Highest stars</option>
+        <option value="delivery">Soonest delivery</option>
       </select>
       <select id="rsa-pages" title="How many result pages to include">
         ${[1, 2, 3, 5, 10].map((n) => `<option value="${n}"${n === 3 ? " selected" : ""}>${n === 1 ? "This page" : n + " pages"}</option>`).join("")}
       </select>
       <select id="rsa-min" title="Minimum star rating">
         <option value="0">Any stars</option><option value="4">4★+</option><option value="4.5">4.5★+</option>
+      </select>
+      <select id="rsa-by" title="Latest acceptable arrival (soonest option shown on the card, free or paid)">
+        <option value="">Any delivery</option>
+        <option value="0">Arrives today</option>
+        <option value="1">By tomorrow</option>
+        <option value="2">Within 2 days</option>
+        <option value="3">Within 3 days</option>
+        <option value="7">Within a week</option>
+        <option value="14">Within 2 weeks</option>
       </select>
       <label class="rsa-check"><input type="checkbox" id="rsa-ads" checked> Hide sponsored</label>
       <button id="rsa-apply" class="rsa-primary" type="button">Sort</button>
@@ -329,5 +428,5 @@
   }).observe(document.body, { childList: true, subtree: true });
 
   // Expose parsers for testing.
-  window.__rsa = { parseCount, lastNumberToken, weightedScore, getReviewCount, getRating };
+  window.__rsa = { parseCount, lastNumberToken, weightedScore, getReviewCount, getRating, optionDate, getDeliveryDate };
 })();

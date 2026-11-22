@@ -10,7 +10,8 @@ Chrome extension (Manifest V3, no permissions) that adds a sort bar above Amazon
 ## What this version adds
 - Sort by **most reviews**, **highest stars**, or a **weighted score** (Bayesian average, so 5.0★ from 3 reviews doesn't beat 4.7★ from 20k).
 - Merges up to **10 result pages** before sorting (fetched one at a time, 600 ms apart; stops if Amazon shows a captcha).
-- Hide sponsored results, minimum star filter, review/rating badge on each card.
+- Hide sponsored results, minimum star filter, review/rating/arrival badge on each card.
+- **Delivery date**: sort by soonest arrival, or keep only items arriving today, by tomorrow, or within 2/3/7/14 days. Uses the soonest option on the card (free or paid "fastest delivery"), and the last day of a range.
 - Amazon's native sort button: uses the sidebar department, or shows a department picker (Amazon ignores this sort without one).
 - Locale-aware number parsing (`12,345`, `12.345`, `12 345`, `12.3K`).
 
