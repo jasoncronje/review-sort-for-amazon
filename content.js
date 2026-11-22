@@ -141,11 +141,11 @@
   }
 
   function formatDelivery(ts) {
-    if (!isFinite(ts)) return "no date";
+    if (!isFinite(ts)) return "No delivery date";
     const days = Math.round((ts - startOfToday()) / DAY_MS);
-    if (days <= 0) return "arrives today";
-    if (days === 1) return "arrives tomorrow";
-    return "arrives " + new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    if (days <= 0) return "Arrives today";
+    if (days === 1) return "Arrives tomorrow";
+    return "Arrives " + new Date(ts).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
   }
 
   function isSponsored(card) {
@@ -289,10 +289,9 @@
         if (!badge) {
           badge = document.createElement("div");
           badge.className = "rsa-badge";
-          (item.el.querySelector(".s-card-container, .puis-card-container") || item.el).prepend(badge);
+          placeBadge(item.el, badge);
         }
-        const stars = item.rating ? `${item.rating.toFixed(1)} out of 5` : "No rating";
-        badge.innerHTML = `<b>${item.count.toLocaleString()}</b> reviews<span>${stars}</span><span>${formatDelivery(item.delivery)}</span>`;
+        badge.innerHTML = `<b>${item.count.toLocaleString()}</b> reviews<span>${formatDelivery(item.delivery)}</span>`;
         frag.appendChild(item.el);
       }
       if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
@@ -311,6 +310,17 @@
       bar.classList.remove("is-busy");
       if (state.again) { state.again = false; applySort(); }
     }
+  }
+
+  // Put the summary line in the card's text column, right under the star rating, so it sits
+  // with the product details in both the grid and the wide list layout.
+  function placeBadge(card, badge) {
+    const after = card.querySelector('[data-cy="reviews-block"]') || card.querySelector('[data-cy="title-recipe"]');
+    if (after) { after.after(badge); return; }
+    const h2 = card.querySelector("h2");
+    const row = h2 && (h2.closest("a") || h2).parentElement;
+    if (row) row.append(badge);
+    else (card.querySelector(".s-card-container, .puis-card-container") || card).prepend(badge);
   }
 
   // Marks a dropdown as changed from its default, the way Amazon outlines an applied filter.
