@@ -421,8 +421,8 @@
       return;
     }
     const wrap = document.createElement("label");
-    wrap.className = "rsa-dd";
-    wrap.innerHTML = `<span class="rsa-dd-label">Department:</span>`;
+    wrap.className = "rsa-dd is-set";
+    wrap.innerHTML = `<span class="rsa-dd-label">Department</span>`;
     const sel = document.createElement("select");
     sel.id = "rsa-dept";
     wrap.append(sel);
@@ -437,7 +437,7 @@
       url.searchParams.delete("page");
       location.href = url.toString();
     });
-    document.getElementById("rsa-native").after(wrap);
+    document.querySelector("#rsa-bar .rsa-controls").append(wrap);
     setStatus("Amazon's sort needs a department.");
     sel.focus();
   }
@@ -457,30 +457,38 @@
     bar.setAttribute("aria-label", "Review sort");
     const nativeActive = params().get("sort") === "review-count-rank";
     bar.innerHTML = `
+      <span class="rsa-brand" aria-hidden="true"><span class="rsa-mark"><svg viewBox="0 0 10 10"><path d="M1 9V5M5 9V1M9 9V3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>Review Sort</span>
       <div class="rsa-controls">
-        ${dropdown("rsa-key", "Sort by:", "Order of results", [
+        ${dropdown("rsa-key", "Sort", "Order of results", [
           ["featured", "Featured"], ["reviews", "Most reviews"], ["score", "Best rated"],
           ["rating", "Highest stars"], ["delivery", "Soonest delivery"],
         ])}
-        ${dropdown("rsa-by", "Arrives:", "Soonest option on the card, free or paid", [
+        ${dropdown("rsa-by", "Arrives", "Soonest option on the card, free or paid", [
           ["", "Any time"], ["0", "Today"], ["1", "By tomorrow"], ["2", "Within 2 days"],
           ["3", "Within 3 days"], ["7", "Within a week"], ["14", "Within 2 weeks"],
         ])}
-        ${dropdown("rsa-min", "Rating:", "Minimum star rating", [["0", "Any"], ["4", "4 stars & up"], ["4.5", "4.5 stars & up"]])}
-        ${dropdown("rsa-pages", "Include:", "Result pages to load and merge before sorting", [
-          ["1", "This page"], ["2", "2 pages"], ["3", "3 pages", true], ["5", "5 pages"], ["10", "10 pages"],
+        ${dropdown("rsa-min", "Stars", "Minimum star rating", [["0", "Any"], ["4", "4 & up"], ["4.5", "4.5 & up"]])}
+        ${dropdown("rsa-pages", "Pages", "Result pages to load and merge before sorting", [
+          ["1", "1"], ["2", "2"], ["3", "3", true], ["5", "5"], ["10", "10"],
         ])}
         <button id="rsa-ads" class="rsa-chip" type="button" aria-pressed="false">
-          <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide sponsored
+          <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide ads
         </button>
       </div>
       <div class="rsa-meta">
         <span id="rsa-status" aria-live="polite"></span>
-        <button id="rsa-reset" class="rsa-link" type="button" hidden>Clear</button>
         <button id="rsa-save" class="rsa-link" type="button" hidden title="Use these settings on every Amazon search">Save as default</button>
-        <button id="rsa-forget" class="rsa-link" type="button" hidden>Forget defaults</button>
-        <button id="rsa-native" class="rsa-link" type="button" title="Amazon's own review-count sort across every page. Needs a department."
-          ${nativeActive ? "disabled" : ""}>${nativeActive ? "Using Amazon's review sort" : "Use Amazon's review sort"}</button>
+        <div class="rsa-menu-wrap">
+          <button id="rsa-more" class="rsa-more" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="More options">
+            <svg viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.6"/><circle cx="8" cy="2" r="1.6"/><circle cx="14" cy="2" r="1.6"/></svg>
+          </button>
+          <div id="rsa-menu" class="rsa-menu" role="menu" hidden>
+            <button id="rsa-reset" role="menuitem" type="button" hidden>Clear sorting</button>
+            <button id="rsa-forget" role="menuitem" type="button" hidden>Forget defaults</button>
+            <button id="rsa-native" role="menuitem" type="button" title="Amazon's own review-count sort across every page. Needs a department."
+              ${nativeActive ? "disabled" : ""}>${nativeActive ? "Using Amazon's review sort" : "Use Amazon's review sort"}</button>
+          </div>
+        </div>
       </div>`;
     // The "Include" dropdown is marked set only when it differs from its default (3 pages).
     bar.querySelectorAll("select").forEach((sel) => {
@@ -497,6 +505,17 @@
       state.touched = true;
       refreshDefaultsUI();
       applySort();
+    });
+    const more = bar.querySelector("#rsa-more"), menu = bar.querySelector("#rsa-menu");
+    const setMenu = (open) => { menu.hidden = !open; more.setAttribute("aria-expanded", String(open)); };
+    more.addEventListener("click", () => {
+      setMenu(menu.hidden);
+      if (!menu.hidden) menu.querySelector("button:not([hidden]):not(:disabled)")?.focus();
+    });
+    menu.addEventListener("click", () => setMenu(false));
+    document.addEventListener("click", (e) => { if (!e.target.closest?.(".rsa-menu-wrap")) setMenu(false); });
+    bar.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !menu.hidden) { setMenu(false); more.focus(); }
     });
     bar.querySelector("#rsa-reset").addEventListener("click", resetSort);
     bar.querySelector("#rsa-native").addEventListener("click", nativeSort);
