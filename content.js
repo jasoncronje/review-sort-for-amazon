@@ -262,6 +262,7 @@
       const pos = (x) => state.order.get(x.asin);
       const sorters = {
         featured: (a, b) => pos(a) - pos(b),
+        native: (a, b) => pos(a) - pos(b), // Amazon already ranked every result by reviews
         reviews: (a, b) => b.count - a.count || b.rating - a.rating,
         rating: (a, b) => b.rating - a.rating || b.count - a.count,
         score: (a, b) => b.score - a.score || b.count - a.count,
@@ -280,7 +281,7 @@
         // Only what the listing doesn't already show: the rank in our order, and the weighted
         // score for "Best rated" (Amazon shows the count and delivery date itself).
         let badge = item.el.querySelector(".rsa-badge");
-        if (key === "featured" || hide) { badge?.remove(); }
+        if (key === "featured" || key === "native" || hide) { badge?.remove(); }
         else {
           if (!badge) {
             badge = document.createElement("div");
@@ -378,7 +379,8 @@
   function resetSort() {
     // Reload the page as Amazon served it, without applying saved defaults this once.
     try { sessionStorage.setItem(SKIP_KEY, "1"); } catch {}
-    location.reload();
+    if (nativeActive()) location.href = withoutNativeSort();
+    else location.reload();
   }
 
   // Amazon ignores review-count-rank without a department, so borrow the top
@@ -450,19 +452,55 @@
         <select id="${id}">${options.map(([v, t, sel]) => `<option value="${v}"${sel ? " selected" : ""}>${t}</option>`).join("")}</select>${CHEVRON}
       </label>`;
 
+  const PENDING_KEY = "rsa-pending-sort"; // the sort to apply after leaving Amazon's ranking
+  const nativeActive = () => params().get("sort") === "review-count-rank";
+
+  // The second group's label says how much of the search gets re-sorted.
+  function labelOurs() {
+    const n = +val("rsa-pages");
+    document.getElementById("rsa-ours").setAttribute("label", n === 1 ? "This page, re-sorted" : `First ${n} pages, re-sorted`);
+  }
+
+  // Moving into or out of Amazon's own ranking needs a new page from Amazon.
+  // Returns true when it navigates (or waits on the department picker).
+  function switchRanking(key) {
+    if (key === "native" && !nativeActive()) { nativeSort(); return true; }
+    if (key !== "native" && nativeActive()) {
+      try { sessionStorage.setItem(PENDING_KEY, key); } catch {} // also stops a saved default sending us back
+      location.href = withoutNativeSort();
+      return true;
+    }
+    return false;
+  }
+  function withoutNativeSort() {
+    const url = new URL(location.href);
+    url.searchParams.delete("sort");
+    url.searchParams.delete("page");
+    return url.toString();
+  }
+
   function buildBar() {
     const bar = document.createElement("div");
     bar.id = BAR_ID;
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", "Review sort");
-    const nativeActive = params().get("sort") === "review-count-rank";
     bar.innerHTML = `
       <span class="rsa-brand" aria-hidden="true"><span class="rsa-mark"><svg viewBox="0 0 10 10"><path d="M1 9V5M5 9V1M9 9V3" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></span>Review Sort</span>
       <div class="rsa-controls">
-        ${dropdown("rsa-key", "Sort", "Order of results", [
-          ["featured", "Featured"], ["reviews", "Most reviews"], ["score", "Best rated"],
-          ["rating", "Highest stars"], ["delivery", "Soonest delivery"],
-        ])}
+        <label class="rsa-dd" title="Order of results"><span class="rsa-dd-label">Sort</span>
+          <select id="rsa-key">
+            <optgroup label="All results, Amazon's ranking">
+              <option value="featured">Featured</option>
+              <option value="native">Most reviews (all results)</option>
+            </optgroup>
+            <optgroup id="rsa-ours" label="First 3 pages, re-sorted">
+              <option value="reviews">Most reviews</option>
+              <option value="score">Best rated</option>
+              <option value="rating">Highest stars</option>
+              <option value="delivery">Soonest delivery</option>
+            </optgroup>
+          </select>${CHEVRON}
+        </label>
         ${dropdown("rsa-by", "Arrives", "Soonest option on the card, free or paid", [
           ["", "Any time"], ["0", "Today"], ["1", "By tomorrow"], ["2", "Within 2 days"],
           ["3", "Within 3 days"], ["7", "Within a week"], ["14", "Within 2 weeks"],
@@ -485,14 +523,14 @@
           <div id="rsa-menu" class="rsa-menu" role="menu" hidden>
             <button id="rsa-reset" role="menuitem" type="button" hidden>Clear sorting</button>
             <button id="rsa-forget" role="menuitem" type="button" hidden>Forget defaults</button>
-            <button id="rsa-native" role="menuitem" type="button" title="Amazon's own review-count sort across every page. Needs a department."
-              ${nativeActive ? "disabled" : ""}>${nativeActive ? "Using Amazon's review sort" : "Use Amazon's review sort"}</button>
           </div>
         </div>
       </div>`;
     // The "Include" dropdown is marked set only when it differs from its default (3 pages).
     bar.querySelectorAll("select").forEach((sel) => {
       sel.addEventListener("change", () => {
+        if (sel.id === "rsa-key" && switchRanking(sel.value)) return;
+        if (sel.id === "rsa-pages") labelOurs();
         markSet(sel);
         state.touched = true;
         refreshDefaultsUI();
@@ -518,7 +556,6 @@
       if (e.key === "Escape" && !menu.hidden) { setMenu(false); more.focus(); }
     });
     bar.querySelector("#rsa-reset").addEventListener("click", resetSort);
-    bar.querySelector("#rsa-native").addEventListener("click", nativeSort);
     bar.querySelector("#rsa-save").addEventListener("click", () => {
       setStatus(saveDefaults(readControls()) ? "Saved. These settings now apply to every search." : "Couldn't save: this browser blocks site storage.");
       refreshDefaultsUI();
@@ -539,13 +576,23 @@
     const host = container.closest(".s-desktop-content, .sg-col-inner, .s-matching-dir") || container.parentNode;
     host.insertBefore(buildBar(), host.firstChild === container ? container : host.firstChild);
 
-    let skip = false;
-    try { skip = sessionStorage.getItem(SKIP_KEY) === "1"; sessionStorage.removeItem(SKIP_KEY); } catch {}
+    let skip = false, pending = null;
+    try {
+      skip = sessionStorage.getItem(SKIP_KEY) === "1"; sessionStorage.removeItem(SKIP_KEY);
+      pending = sessionStorage.getItem(PENDING_KEY); sessionStorage.removeItem(PENDING_KEY);
+    } catch {}
     const saved = loadDefaults();
-    if (saved && !skip) {
-      writeControls(saved);
-      if (changesResults(saved)) applySort();
+    let start = saved && !skip ? { ...saved } : { ...BASE };
+    if (pending) { start.key = pending; state.touched = true; }
+    if (nativeActive()) start.key = "native";
+    else if (start.key === "native") {
+      // A saved default of Amazon's ranking: go there when Amazon can do it without asking.
+      if (!pending && (hasDepartment() || topDepartmentParams())) { writeControls(start); nativeSort(); return; }
+      start.key = "featured";
     }
+    writeControls(start);
+    labelOurs();
+    if (changesResults(start)) applySort();
     refreshDefaultsUI();
   }
 
