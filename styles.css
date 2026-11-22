@@ -106,14 +106,16 @@
 #rsa-bar.is-busy #rsa-status { color: var(--rsa-ink); }
 #rsa-bar.is-busy .rsa-controls { opacity: 0.6; transition: opacity 0.15s ease; }
 
-/* Per-card summary: plain text in Amazon's secondary style, no pill */
+/* Per-card summary: same size as Amazon's "4K+ bought in past month" line */
 .rsa-badge {
-  margin: 2px 0 4px;
-  font: 400 12px/16px "Amazon Ember", Arial, sans-serif;
-  color: #565959;
+  margin: 2px 0 6px;
+  font: 400 14px/20px "Amazon Ember", Arial, sans-serif;
+  color: #0f1111;
 }
-.rsa-badge b { font-weight: 700; color: #0f1111; }
-.rsa-badge span::before { content: "·"; margin: 0 6px; }
+.rsa-badge b { font-weight: 700; }
+.rsa-badge span { color: #565959; }
+.rsa-badge .rsa-rank { color: #c7511f; font-weight: 700; }
+.rsa-badge i { font-style: normal; color: #565959; margin: 0 6px; }
 
 .rsa-hidden { display: none !important; }
 

@@ -291,7 +291,16 @@
           badge.className = "rsa-badge";
           placeBadge(item.el, badge);
         }
-        badge.innerHTML = `<b>${item.count.toLocaleString()}</b> reviews<span>${formatDelivery(item.delivery)}</span>`;
+        // Rank in the sorted list, then the facts; the one being sorted on comes first, in bold.
+        const reviews = `${item.count.toLocaleString()} reviews`;
+        const arrives = formatDelivery(item.delivery);
+        const stars = item.rating ? `${item.rating.toFixed(1)} out of 5` : "No rating";
+        const facts = key === "delivery" ? [arrives, reviews]
+          : key === "score" || key === "rating" ? [reviews, stars, arrives]
+          : [reviews, arrives];
+        const parts = facts.map((f, i) => (i === 0 ? `<b>${f}</b>` : `<span>${f}</span>`));
+        if (key !== "featured" && !hide) parts.unshift(`<span class="rsa-rank">#${shown}</span>`);
+        badge.innerHTML = parts.join('<i aria-hidden="true">·</i>');
         frag.appendChild(item.el);
       }
       if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
