@@ -147,6 +147,26 @@
     );
   }
 
+  // "No-name" brands: a list of 1,000 marketplace brands (see gen-brands.py), matched
+  // against the card's brand line or the start of its title.
+  const NO_NAME = new Set((globalThis.RSA_NO_NAME_BRANDS || "").split("|").filter(Boolean));
+  const normBrand = (s) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function isNoName(card) {
+    if (!NO_NAME.size) return false;
+    const recipe = card.querySelector('[data-cy="title-recipe"]');
+    // Some layouts (fashion, home) print the brand on its own line above the title.
+    const brandLine = recipe?.querySelector("h2.a-size-mini span, .a-row > span.a-size-base-plus.a-color-base, .a-row > span.a-size-medium.a-color-base");
+    if (brandLine && !brandLine.closest("a") && NO_NAME.has(normBrand(brandLine.textContent))) return true;
+    const title = (card.querySelector("h2")?.getAttribute("aria-label") || card.querySelector("h2")?.textContent || "").trim();
+    const words = title.split(/\s+/).slice(0, 4);
+    let joined = "";
+    for (const w of words) {
+      joined += normBrand(w);
+      if (joined.length >= 3 && NO_NAME.has(joined)) return true;
+    }
+    return false;
+  }
+
   // Bayesian average: pulls low-review products toward a prior so 5.0 from 3 reviews
   // doesn't beat 4.7 from 20,000.
   function weightedScore(rating, count, prior = 4.0, weight = 300) {
@@ -173,6 +193,7 @@
     card.dataset.rsaReviews = String(getReviewCount(card));
     card.dataset.rsaRating = String(getRating(card));
     card.dataset.rsaSponsored = isSponsored(card) ? "1" : "0";
+    card.dataset.rsaNoName = isNoName(card) ? "1" : "0";
     card.dataset.rsaDelivery = String(getDeliveryDate(card));
   }
 
@@ -182,7 +203,7 @@
     const rating = +card.dataset.rsaRating;
     return {
       el: card, asin: card.dataset.asin, count, rating, score: weightedScore(rating, count),
-      sponsored: card.dataset.rsaSponsored === "1", delivery: +card.dataset.rsaDelivery,
+      sponsored: card.dataset.rsaSponsored === "1", noName: card.dataset.rsaNoName === "1", delivery: +card.dataset.rsaDelivery,
     };
   }
 
@@ -233,6 +254,7 @@
   }
 
   const val = (id) => document.getElementById(id).value;
+  const pressed = (id) => document.getElementById(id).getAttribute("aria-pressed") === "true";
 
   // Runs on every control change. A change made while pages are loading re-runs once at the end.
   async function applySort() {
@@ -245,7 +267,8 @@
     try {
       const key = val("rsa-key");
       const ok = await loadPages(+val("rsa-pages"));
-      const hideAds = document.getElementById("rsa-ads").getAttribute("aria-pressed") === "true";
+      const hideAds = pressed("rsa-ads");
+      const hideNoName = pressed("rsa-noname");
       const minRating = +val("rsa-min");
       const byDays = val("rsa-by"); // "" = any
       const deadline = byDays === "" ? Infinity : +startOfToday() + +byDays * DAY_MS;
@@ -275,7 +298,7 @@
       const frag = document.createDocumentFragment();
       let shown = 0;
       for (const item of all) {
-        const hide = (hideAds && item.sponsored) || (minRating && item.rating < minRating) || item.delivery > deadline;
+        const hide = (hideAds && item.sponsored) || (hideNoName && item.noName) || (minRating && item.rating < minRating) || item.delivery > deadline;
         item.el.classList.toggle("rsa-hidden", !!hide);
         if (!hide) shown++;
         // Only what the listing doesn't already show: the rank in our order, and the weighted
@@ -335,7 +358,7 @@
 
   const STORE_KEY = "rsa-defaults-v1";
   const SKIP_KEY = "rsa-skip-defaults"; // set by Clear so the reload shows Amazon's own page
-  const BASE = { key: "featured", by: "", min: "0", pages: "3", ads: false };
+  const BASE = { key: "featured", by: "", min: "0", pages: "3", ads: false, noname: false };
   const FIELDS = { key: "rsa-key", by: "rsa-by", min: "rsa-min", pages: "rsa-pages" };
 
   function loadDefaults() {
@@ -347,12 +370,13 @@
     catch { return false; }
   }
   const sameSettings = (a, b) => !!a && !!b && Object.keys(BASE).every((k) => a[k] === b[k]);
-  const changesResults = (v) => v.key !== BASE.key || v.by !== BASE.by || v.min !== BASE.min || v.ads;
+  const changesResults = (v) => v.key !== BASE.key || v.by !== BASE.by || v.min !== BASE.min || v.ads || v.noname;
 
   function readControls() {
     const v = {};
     for (const [k, id] of Object.entries(FIELDS)) v[k] = val(id);
-    v.ads = document.getElementById("rsa-ads").getAttribute("aria-pressed") === "true";
+    v.ads = pressed("rsa-ads");
+    v.noname = pressed("rsa-noname");
     return v;
   }
   function writeControls(v) {
@@ -363,6 +387,7 @@
       markSet(sel);
     }
     document.getElementById("rsa-ads").setAttribute("aria-pressed", String(!!v.ads));
+    document.getElementById("rsa-noname").setAttribute("aria-pressed", String(!!v.noname));
   }
 
   // Shows "Save as default" when the bar differs from what's saved, and "Forget defaults" when
@@ -493,7 +518,7 @@
           <h4>Find what people actually buy and like</h4>
           <p>Amazon puts popular and sponsored items first. Review Sort reorders the results so the most trusted products rise to the top.</p>
           <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 10h15M10 2.5c2.2 2.4 2.2 12.6 0 15M10 2.5c-2.2 2.4-2.2 12.6 0 15" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span><div><b>Amazon Sort</b><span>Amazon lines up every matching product by number of reviews. The most thorough option, but it can only sort by reviews.</span></div></div>
-          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>Custom Sort</b><span>Sorts Amazon doesn't offer: best rated, highest stars and soonest delivery, plus filters for arrival date and ads. To do this, Review Sort reorders the first pages you'd see (you pick how many with Pages).</span></div></div>
+          <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="5.5" y="3" width="10" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.5 6v10.5A1.5 1.5 0 0 0 5 18h8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 7.5h4M8.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span><div><b>Custom Sort</b><span>Sorts Amazon doesn't offer: best rated, highest stars and soonest delivery, plus filters for arrival date, ads and no-name brands. To do this, Review Sort reorders the first pages you'd see (you pick how many with Pages).</span></div></div>
           <div class="rsa-tip-row"><span class="rsa-tip-ic" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span><div><b>Best rated</b><span>Weighs stars against how many people gave them, so 5 stars from 3 people won't beat 4.7 stars from 20,000.</span></div></div>
           <div class="rsa-tip-foot">Like your setup? Click <b>Save as default</b> and it's used on every search.</div>
         </div>
@@ -524,6 +549,9 @@
         <button id="rsa-ads" class="rsa-chip" type="button" aria-pressed="false">
           <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide ads
         </button>
+        <button id="rsa-noname" title="Hides 1,000 common marketplace brands (US trademarks registered to companies in China)" class="rsa-chip" type="button" aria-pressed="false">
+          <svg class="rsa-tick" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.5l3.2 3L11 1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Hide no-name brands
+        </button>
       </div>
       <div class="rsa-meta">
         <span id="rsa-status" aria-live="polite"></span>
@@ -549,13 +577,13 @@
         applySort();
       });
     });
-    bar.querySelector("#rsa-ads").addEventListener("click", (e) => {
+    bar.querySelectorAll(".rsa-chip").forEach((chip) => chip.addEventListener("click", (e) => {
       const b = e.currentTarget;
       b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
       state.touched = true;
       refreshDefaultsUI();
       applySort();
-    });
+    }));
     const more = bar.querySelector("#rsa-more"), menu = bar.querySelector("#rsa-menu");
     const setMenu = (open) => { menu.hidden = !open; more.setAttribute("aria-expanded", String(open)); };
     more.addEventListener("click", () => {
