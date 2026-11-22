@@ -18,9 +18,9 @@ Chrome extension (Manifest V3, no permissions) that adds a sort bar above Amazon
 - A plain-language "how it works" card opens from the ⓘ next to the Review Sort name (click to open; click outside or press Escape to close).
 - **Hide no-name brands**: hides brands whose US trademark is owned from China, except well-known ones. Three lists in `data/`:
   - `amazon_brand_candidates_1000.csv`: 1,000 brands seen most in Amazon reviews (always hidden).
-  - `cn_trademarks.txt.gz`: ~717k live US trademark names whose current owner has a China address, minus names also registered from other countries and names made only of common words. Built by `tools/fetch-trademarks.py` from the public USPTO case files (Hugging Face `illeatmyhat/uspto-trademarks`, data through 2026-10-31). Shipped as a ~1.7 MB Bloom filter (about 1 wrong hit per 10,000 lookups).
+  - `cn_trademarks.txt.gz`: ~712k live US trademark names whose current owner has a China address, minus names also registered from other countries and names made only of common words. Built by `tools/fetch-trademarks.py` from the public USPTO case files (Hugging Face `illeatmyhat/uspto-trademarks`, data through 2026-10-31). Shipped as a ~1.7 MB Bloom filter (about 1 wrong hit per 10,000 lookups).
   - `keep-brands.txt`: well-known brands never hidden (Anker, UGREEN, Xiaomi, Govee...). Edit it, then run `./gen-brands.py`.
-  Matching uses the card's brand line, or the first 1-3 words of the title.
+  Matching uses the card's brand line when Amazon shows one (and then never guesses from the title), otherwise the first 1-3 words of the title. Names that are common words in English or another Amazon-site language (e.g. CROSSBODY, TECLADO) are left out of the trademark list.
 - **Saved defaults**: set the bar the way you like and click *Save as default*; it then applies to every search on that Amazon site. In the ⋯ menu, *Forget defaults* removes them, and *Clear sorting* shows Amazon's own page once without them. Stored in that Amazon site's localStorage, so each country site keeps its own.
 - Locale-aware number parsing (`12,345`, `12.345`, `12 345`, `12.3K`).
 

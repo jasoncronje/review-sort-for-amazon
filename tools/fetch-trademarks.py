@@ -15,7 +15,8 @@ Rules for a kept name (key = uppercase letters/digits words joined by one space)
     (spaced or squashed together) owned from any other country
   - 4+ letters/digits once spaces are removed, at most 3 words
   - not made only of common words: a word counts as common if it's in the system
-    dictionary, has English word frequency (wordfreq zipf) >= 2.5, appears in 20+ non-CN
+    dictionary, has English word frequency (wordfreq zipf) >= 2.0 or >= 3.0 in another
+    Amazon-site language, appears in 20+ non-CN
     marks, is all digits, or is 1-2 characters long
 """
 import collections, gzip, os, re, sys
@@ -50,8 +51,12 @@ for mark, country in rows:
         other[" ".join(t)] += 1; squashed_other.add("".join(t))
         for w in set(t): word_use[w] += 1
 dictionary = {w.strip().upper() for w in open("/usr/share/dict/words")}
+OTHER_LANGS = ["es", "fr", "de", "it", "pt", "nl", "pl", "sv", "tr"]  # other Amazon sites
 def common(w):
-    return w in dictionary or len(w) <= 2 or w.isdigit() or word_use[w] >= 20 or zipf_frequency(w.lower(), "en") >= 2.5
+    lw = w.lower()
+    return (w in dictionary or len(w) <= 2 or w.isdigit() or word_use[w] >= 20
+            or zipf_frequency(lw, "en") >= 2.0  # catches product words like CROSSBODY, DUMBBELLS
+            or max(zipf_frequency(lw, l) for l in OTHER_LANGS) >= 3.0)  # e.g. TECLADO (keyboard)
 keep = []
 for key in cn:
     words = key.split(" "); squashed = "".join(words)

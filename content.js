@@ -70,6 +70,8 @@
 
   const DAY_MS = 864e5;
   const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  // Calendar days, not 24-hour blocks, so daylight-saving changes don't shift the date.
+  const daysFromToday = (n) => { const d = startOfToday(); d.setDate(d.getDate() + n); return d; };
 
   // Month names for English plus the page's own language (amazon.de -> "Dez.", amazon.fr -> "déc.").
   const MONTHS = (() => {
@@ -105,7 +107,7 @@
   function optionDate(text) {
     const t = text.toLowerCase();
     if (/\btoday\b|\bheute\b|aujourd|\bhoy\b|\boggi\b|vandaag/.test(t)) return startOfToday();
-    if (/\btomorrow\b|\bovernight\b|\bmorgen\b|demain|mañana|domani/.test(t)) return new Date(+startOfToday() + DAY_MS);
+    if (/\btomorrow\b|\bovernight\b|\bmorgen\b|demain|mañana|domani/.test(t)) return daysFromToday(1);
     let best = null;
     for (const m of t.matchAll(MD_RANGE)) {
       const m1 = MONTHS.get(m[1].replace(/\.$/, ""));
@@ -153,19 +155,23 @@
   const brandSet = (s) => new Set((s || "").split("|").filter(Boolean));
   const NO_NAME = brandSet(globalThis.RSA_NO_NAME_BRANDS);
   const KEEP = brandSet(globalThis.RSA_KEEP_BRANDS);
-  const MARKS = (() => {
+  // Decoded on first use (a search with the filter on), not on every Amazon page.
+  let MARKS;
+  const marks = () => (MARKS === undefined ? (MARKS = decodeMarks()) : MARKS);
+  function decodeMarks() {
     const f = globalThis.RSA_CN_MARKS;
     if (!f) return null;
     const raw = atob(f.bits), bits = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bits[i] = raw.charCodeAt(i);
     return { m: f.m, k: f.k, bits };
-  })();
+  }
   function fnv(s, seed) {
     let h = seed;
     for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0;
     return h;
   }
   function inMarks(key) {
+    const MARKS = marks();
     if (!MARKS) return false;
     const h1 = fnv(key, 2166136261), h2 = (fnv(key, 0x9747b28c) | 1) >>> 0;
     for (let i = 0; i < MARKS.k; i++) {
@@ -190,8 +196,8 @@
     // Some layouts (fashion, home) print the brand on its own line above the title.
     const brandLine = recipe?.querySelector("h2.a-size-mini span, .a-row > span.a-size-base-plus.a-color-base, .a-row > span.a-size-medium.a-color-base");
     if (brandLine && !brandLine.closest("a")) {
-      const verdict = judgeBrand(brandWords(brandLine.textContent));
-      if (verdict !== null) return verdict;
+      // Amazon named the brand, so trust that and don't guess from the title's first words.
+      return judgeBrand(brandWords(brandLine.textContent)) === true;
     }
     const h2 = card.querySelector("h2");
     return !!judgeBrand(brandWords(h2?.getAttribute("aria-label") || h2?.textContent || ""));
@@ -223,8 +229,13 @@
     card.dataset.rsaReviews = String(getReviewCount(card));
     card.dataset.rsaRating = String(getRating(card));
     card.dataset.rsaSponsored = isSponsored(card) ? "1" : "0";
-    card.dataset.rsaNoName = isNoName(card) ? "1" : "0";
+
     card.dataset.rsaDelivery = String(getDeliveryDate(card));
+  }
+
+  function noName(card) {
+    if (!card.dataset.rsaNoName) card.dataset.rsaNoName = isNoName(card) ? "1" : "0";
+    return card.dataset.rsaNoName === "1";
   }
 
   function readCard(card) {
@@ -233,7 +244,7 @@
     const rating = +card.dataset.rsaRating;
     return {
       el: card, asin: card.dataset.asin, count, rating, score: weightedScore(rating, count),
-      sponsored: card.dataset.rsaSponsored === "1", noName: card.dataset.rsaNoName === "1", delivery: +card.dataset.rsaDelivery,
+      sponsored: card.dataset.rsaSponsored === "1", noName: () => noName(card), delivery: +card.dataset.rsaDelivery,
     };
   }
 
@@ -264,7 +275,6 @@
       +([...document.querySelectorAll(".s-pagination-item")].map((e) => +e.textContent).filter(Boolean).pop() || MAX_PAGES);
     const startPage = +(params().get("page") || 1);
     const want = Math.min(target, MAX_PAGES);
-    const seen = new Set([...document.querySelectorAll(RESULT_SEL)].map((e) => e.dataset.asin).concat(state.extra.map((e) => e.dataset.asin)));
     while (state.pagesLoaded < want) {
       const page = startPage + state.pagesLoaded;
       if (lastPage && page > lastPage) break;
@@ -272,7 +282,8 @@
       try {
         const cards = await fetchPage(page);
         if (!cards.length) break;
-        for (const c of cards) if (!seen.has(c.dataset.asin)) { seen.add(c.dataset.asin); state.extra.push(c); }
+        // Keep repeats too: applySort picks the best copy of each product (organic over ad).
+        for (const c of cards) { c.dataset.rsaPage = String(state.pagesLoaded + 1); state.extra.push(c); }
       } catch (err) {
         setStatus(err.message === "captcha" ? "Amazon asked for a captcha. Stopped early." : `Couldn't load page ${page}.`);
         return false;
@@ -296,19 +307,25 @@
     bar.classList.add("is-busy");
     try {
       const key = val("rsa-key");
-      const ok = await loadPages(+val("rsa-pages"));
+      const pages = +val("rsa-pages");
+      const ok = await loadPages(pages);
+      const pagesUsed = Math.min(pages, state.pagesLoaded);
       const hideAds = pressed("rsa-ads");
       const hideNoName = pressed("rsa-noname");
       const minRating = +val("rsa-min");
       const byDays = val("rsa-by"); // "" = any
-      const deadline = byDays === "" ? Infinity : +startOfToday() + +byDays * DAY_MS;
+      const deadline = byDays === "" ? Infinity : +daysFromToday(+byDays);
 
       const current = [...container.querySelectorAll(RESULT_SEL)];
       const unique = new Map();
       for (const e of [...current, ...state.extra]) {
         if (!state.order.has(e.dataset.asin)) state.order.set(e.dataset.asin, state.order.size); // Amazon's own order
-        if (unique.has(e.dataset.asin)) e.classList.add("rsa-hidden"); // same product listed twice (ad + organic)
-        else unique.set(e.dataset.asin, e);
+        e.classList.add("rsa-hidden"); // shown again below if it's the copy we keep
+        if (+(e.dataset.rsaPage || 1) > pages) continue; // from a page beyond the Pages setting
+        // Same product listed twice (often an ad plus a normal listing): keep the normal one,
+        // so "Hide ads" never removes the product entirely.
+        const prev = unique.get(e.dataset.asin);
+        if (!prev || (isSponsored(prev) && !isSponsored(e))) unique.set(e.dataset.asin, e);
       }
       const all = [...unique.values()].map(readCard);
 
@@ -328,7 +345,7 @@
       const frag = document.createDocumentFragment();
       let shown = 0;
       for (const item of all) {
-        const hide = (hideAds && item.sponsored) || (hideNoName && item.noName) || (minRating && item.rating < minRating) || item.delivery > deadline;
+        const hide = (hideAds && item.sponsored) || (hideNoName && item.noName()) || (minRating && item.rating < minRating) || item.delivery > deadline;
         item.el.classList.toggle("rsa-hidden", !!hide);
         if (!hide) shown++;
         // Only what the listing doesn't already show: the rank in our order, and the weighted
@@ -356,8 +373,9 @@
         if (el.compareDocumentPosition(container.querySelector(RESULT_SEL)) & Node.DOCUMENT_POSITION_PRECEDING) el.classList.add("rsa-hidden");
       });
 
-      if (ok) setStatus(`${shown.toLocaleString()} results from ${state.pagesLoaded} page${state.pagesLoaded > 1 ? "s" : ""}`);
+      if (ok) setStatus(`${shown.toLocaleString()} results from ${pagesUsed} page${pagesUsed > 1 ? "s" : ""}`);
       document.getElementById("rsa-reset").hidden = false;
+      refreshMore();
     } finally {
       state.busy = false;
       bar.classList.remove("is-busy");
@@ -429,6 +447,14 @@
     document.getElementById("rsa-save").hidden = !state.touched || same || (!saved && sameSettings(BASE, readControls()));
     document.getElementById("rsa-forget").hidden = !saved;
     document.getElementById("rsa-forget").textContent = same ? "Forget defaults" : "Forget saved defaults";
+    refreshMore();
+  }
+
+  // The ⋯ button only shows when its menu has something in it.
+  function refreshMore() {
+    const empty = [...document.querySelectorAll("#rsa-menu button")].every((b) => b.hidden);
+    document.getElementById("rsa-more").hidden = empty;
+    if (empty) document.getElementById("rsa-menu").hidden = true;
   }
 
   function resetSort() {
@@ -666,7 +692,9 @@
     if (nativeActive()) start.key = "native";
     else if (start.key === "native") {
       // A saved default of Amazon's ranking: go there when Amazon can do it without asking.
-      if (!pending && (hasDepartment() || topDepartmentParams())) { writeControls(start); nativeSort(); return; }
+      // Only when the search already has a department, so it never quietly narrows a broad
+      // search, and never over a sort the shopper picked in Amazon's own dropdown.
+      if (!pending && hasDepartment() && !params().get("s")) { writeControls(start); nativeSort(); return; }
       start.key = "featured";
     }
     writeControls(start);
