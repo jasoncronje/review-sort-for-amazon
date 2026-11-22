@@ -201,7 +201,7 @@
 
   // ---------- state + actions ----------
 
-  const state = { extra: [], pagesLoaded: 1, busy: false, again: false, order: new Map() };
+  const state = { extra: [], pagesLoaded: 1, busy: false, again: false, order: new Map(), touched: false };
 
   function setStatus(text) {
     const s = document.getElementById("rsa-status");
@@ -324,11 +324,60 @@
 
   // Marks a dropdown as changed from its default, the way Amazon outlines an applied filter.
   function markSet(select) {
-    select.closest(".rsa-dd").classList.toggle("is-set", select.selectedIndex !== 0);
+    const base = BASE[Object.keys(FIELDS).find((k) => FIELDS[k] === select.id)];
+    select.closest(".rsa-dd").classList.toggle("is-set", base === undefined ? select.selectedIndex !== 0 : select.value !== base);
+  }
+
+  // ---------- saved defaults ----------
+  // Kept in this Amazon site's localStorage (each country site has its own), so the same
+  // code works as an extension content script and as an Ardia/Violentmonkey userscript.
+
+  const STORE_KEY = "rsa-defaults-v1";
+  const SKIP_KEY = "rsa-skip-defaults"; // set by Clear so the reload shows Amazon's own page
+  const BASE = { key: "featured", by: "", min: "0", pages: "3", ads: false };
+  const FIELDS = { key: "rsa-key", by: "rsa-by", min: "rsa-min", pages: "rsa-pages" };
+
+  function loadDefaults() {
+    try { const v = JSON.parse(localStorage.getItem(STORE_KEY)); return v && typeof v === "object" ? { ...BASE, ...v } : null; }
+    catch { return null; }
+  }
+  function saveDefaults(v) {
+    try { v ? localStorage.setItem(STORE_KEY, JSON.stringify(v)) : localStorage.removeItem(STORE_KEY); return true; }
+    catch { return false; }
+  }
+  const sameSettings = (a, b) => !!a && !!b && Object.keys(BASE).every((k) => a[k] === b[k]);
+  const changesResults = (v) => v.key !== BASE.key || v.by !== BASE.by || v.min !== BASE.min || v.ads;
+
+  function readControls() {
+    const v = {};
+    for (const [k, id] of Object.entries(FIELDS)) v[k] = val(id);
+    v.ads = document.getElementById("rsa-ads").getAttribute("aria-pressed") === "true";
+    return v;
+  }
+  function writeControls(v) {
+    for (const [k, id] of Object.entries(FIELDS)) {
+      const sel = document.getElementById(id);
+      sel.value = v[k];
+      if (sel.selectedIndex < 0) sel.value = BASE[k]; // a saved option that no longer exists
+      markSet(sel);
+    }
+    document.getElementById("rsa-ads").setAttribute("aria-pressed", String(!!v.ads));
+  }
+
+  // Shows "Save as default" when the bar differs from what's saved, and "Forget defaults" when
+  // something is saved.
+  function refreshDefaultsUI() {
+    const saved = loadDefaults();
+    const same = sameSettings(saved, readControls());
+    // Offered only after you change something here, so Clear or Forget don't nag.
+    document.getElementById("rsa-save").hidden = !state.touched || same || (!saved && sameSettings(BASE, readControls()));
+    document.getElementById("rsa-forget").hidden = !saved;
+    document.getElementById("rsa-forget").textContent = same ? "Forget defaults" : "Forget saved defaults";
   }
 
   function resetSort() {
-    // Simplest faithful reset: reload the page as Amazon served it.
+    // Reload the page as Amazon served it, without applying saved defaults this once.
+    try { sessionStorage.setItem(SKIP_KEY, "1"); } catch {}
     location.reload();
   }
 
@@ -428,24 +477,39 @@
       <div class="rsa-meta">
         <span id="rsa-status" aria-live="polite"></span>
         <button id="rsa-reset" class="rsa-link" type="button" hidden>Clear</button>
+        <button id="rsa-save" class="rsa-link" type="button" hidden title="Use these settings on every Amazon search">Save as default</button>
+        <button id="rsa-forget" class="rsa-link" type="button" hidden>Forget defaults</button>
         <button id="rsa-native" class="rsa-link" type="button" title="Amazon's own review-count sort across every page. Needs a department."
           ${nativeActive ? "disabled" : ""}>${nativeActive ? "Using Amazon's review sort" : "Use Amazon's review sort"}</button>
       </div>`;
     // The "Include" dropdown is marked set only when it differs from its default (3 pages).
     bar.querySelectorAll("select").forEach((sel) => {
       sel.addEventListener("change", () => {
-        if (sel.id === "rsa-pages") sel.closest(".rsa-dd").classList.toggle("is-set", sel.value !== "3");
-        else markSet(sel);
+        markSet(sel);
+        state.touched = true;
+        refreshDefaultsUI();
         applySort();
       });
     });
     bar.querySelector("#rsa-ads").addEventListener("click", (e) => {
       const b = e.currentTarget;
       b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+      state.touched = true;
+      refreshDefaultsUI();
       applySort();
     });
     bar.querySelector("#rsa-reset").addEventListener("click", resetSort);
     bar.querySelector("#rsa-native").addEventListener("click", nativeSort);
+    bar.querySelector("#rsa-save").addEventListener("click", () => {
+      setStatus(saveDefaults(readControls()) ? "Saved. These settings now apply to every search." : "Couldn't save: this browser blocks site storage.");
+      refreshDefaultsUI();
+    });
+    bar.querySelector("#rsa-forget").addEventListener("click", () => {
+      saveDefaults(null);
+      state.touched = false;
+      setStatus("Defaults forgotten. Searches open in Amazon's order.");
+      refreshDefaultsUI();
+    });
     return bar;
   }
 
@@ -455,6 +519,15 @@
     if (!container || !container.querySelector(RESULT_SEL)) return;
     const host = container.closest(".s-desktop-content, .sg-col-inner, .s-matching-dir") || container.parentNode;
     host.insertBefore(buildBar(), host.firstChild === container ? container : host.firstChild);
+
+    let skip = false;
+    try { skip = sessionStorage.getItem(SKIP_KEY) === "1"; sessionStorage.removeItem(SKIP_KEY); } catch {}
+    const saved = loadDefaults();
+    if (saved && !skip) {
+      writeControls(saved);
+      if (changesResults(saved)) applySort();
+    }
+    refreshDefaultsUI();
   }
 
   inject();
