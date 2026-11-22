@@ -1,0 +1,38 @@
+#rsa-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid #d5d9d9;
+  border-radius: 8px;
+  background: #f7fafa;
+  font: 13px/1.3 "Amazon Ember", Arial, sans-serif;
+  color: #0f1111;
+}
+#rsa-bar .rsa-title { font-weight: 700; }
+#rsa-bar select,
+#rsa-bar button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid #d5d9d9;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+#rsa-bar button:disabled { opacity: 0.55; cursor: default; }
+#rsa-bar .rsa-primary { background: #ffd814; border-color: #fcd200; font-weight: 600; }
+#rsa-bar .rsa-primary:hover:not(:disabled) { background: #f7ca00; }
+#rsa-bar .rsa-check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#rsa-status { color: #565959; }
+.rsa-badge {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e7f4f5;
+  color: #007185;
+  font: 600 12px/1.4 "Amazon Ember", Arial, sans-serif;
+}
+.rsa-hidden { display: none !important; }
