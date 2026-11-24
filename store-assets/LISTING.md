@@ -65,8 +65,11 @@ Reorders and filters Amazon search results by review count, rating and delivery 
 - I do not use or transfer user data for purposes that are unrelated to my item's single purpose
 - I do not use or transfer user data to determine creditworthiness or for lending purposes
 
-**Privacy policy URL:** not required when no data is collected. If the form insists, use a page that says:
-"Review Sort for Amazon collects no personal data. It has no servers and sends nothing anywhere. Its settings are saved in your browser's local storage on the Amazon site."
+**Privacy policy URL:** https://ussigroup.com/privacy/review-sort-for-amazon
+(Source: `site/public/privacy/review-sort-for-amazon.html` in the ussi-group repo. Same text as PRIVACY.md here; edit both together.)
+
+**Homepage URL:** https://github.com/jasoncronje/review-sort-for-amazon
+**Support URL:** https://github.com/jasoncronje/review-sort-for-amazon/issues
 
 ## Distribution tab
 - Visibility: Public (or Unlisted to test first)
