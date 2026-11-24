@@ -35,3 +35,9 @@ Run `./build-userscript.sh`, then `ardia scripts install review-sort.user.js` (o
 
 ## Chrome Web Store
 `./build-store.sh` builds `dist/review-sort-<version>.zip` without `brands.js`, so the experimental no-name filter (and its Settings section) is left out of the store version. Listing text, privacy answers, screenshots, the promo tile and the icon source are in `store-assets/` (see `store-assets/LISTING.md`).
+
+## Privacy
+Collects no data. See [PRIVACY.md](PRIVACY.md).
+
+## License
+MIT
