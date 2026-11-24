@@ -343,10 +343,21 @@
       // Insert all cards before the first current result, so banners above stay put.
       const anchor = current[0] || null;
       const frag = document.createDocumentFragment();
-      let shown = 0;
+      const hidden = new Set();
       for (const item of all) {
         const hide = (hideAds && item.sponsored) || (hideNoName && item.noName()) || (minRating && item.rating < minRating) || item.delivery > deadline;
         item.el.classList.toggle("rsa-hidden", !!hide);
+        if (hide) hidden.add(item);
+        frag.appendChild(item.el);
+      }
+      if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
+      else container.prepend(frag);
+
+      // Rank only cards people can see. Ad blockers hide some sponsored cards with their own CSS,
+      // so check the computed style once the cards are back on the page.
+      let shown = 0;
+      for (const item of all) {
+        const hide = hidden.has(item) || getComputedStyle(item.el).display === "none";
         if (!hide) shown++;
         // Only what the listing doesn't already show: the rank in our order, and the weighted
         // score for "Best rated" (Amazon shows the count and delivery date itself).
@@ -362,10 +373,7 @@
           badge.innerHTML = `<b>#${shown}</b> ${label}` +
             (key === "score" ? `<span title="Star rating adjusted for how many reviews back it up">Weighted score ${item.score.toFixed(2)}</span>` : "");
         }
-        frag.appendChild(item.el);
       }
-      if (anchor && anchor.parentNode === container) container.insertBefore(frag, anchor);
-      else container.prepend(frag);
 
       // Hide in-feed widgets/carousels between results so the sorted list reads cleanly.
       container.querySelectorAll(":scope > div:not([data-component-type='s-search-result'])").forEach((el) => {
@@ -419,7 +427,9 @@
   function saveSettings(v) {
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(v)); return true; } catch { return false; }
   }
-  const noNameEnabled = () => loadSettings().noNameFilter === true;
+  // The store build ships without brands.js, so the experimental filter is absent there.
+  const HAS_BRANDS = !!globalThis.RSA_CN_MARKS;
+  const noNameEnabled = () => HAS_BRANDS && loadSettings().noNameFilter === true;
 
   function loadDefaults() {
     try { const v = JSON.parse(localStorage.getItem(STORE_KEY)); return v && typeof v === "object" ? { ...BASE, ...v } : null; }
@@ -716,7 +726,7 @@
           <span class="rsa-dlg-msg" role="status"></span>
         </div>
       </section>
-      <section class="rsa-dlg-exp">
+      <section class="rsa-dlg-exp" ${HAS_BRANDS ? "" : "hidden"}>
         <h3>Experimental <span class="rsa-tag">Beta</span></h3>
         <label class="rsa-switch-row">
           <span><b>No-name brand filter</b>

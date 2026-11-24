@@ -32,3 +32,6 @@ Chrome extension (Manifest V3, no permissions) that adds a sort bar above Amazon
 
 ### Ardia / Violentmonkey
 Run `./build-userscript.sh`, then `ardia scripts install review-sort.user.js` (or load the `.user.js` in Violentmonkey).
+
+## Chrome Web Store
+`./build-store.sh` builds `dist/review-sort-<version>.zip` without `brands.js`, so the experimental no-name filter (and its Settings section) is left out of the store version. Listing text, privacy answers, screenshots, the promo tile and the icon source are in `store-assets/` (see `store-assets/LISTING.md`).
